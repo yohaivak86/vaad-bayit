@@ -1,4 +1,5 @@
 const prisma = require('./prisma');
+const { generateInviteCode } = require('./inviteCode');
 
 function toNum(v) {
   if (v === null || v === undefined) return 0;
@@ -9,8 +10,22 @@ function round2(n) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+// Buildings created before invite codes existed don't have one yet - backfill lazily on read.
 async function getBuilding(buildingId) {
-  return prisma.building.findUnique({ where: { id: buildingId } });
+  const building = await prisma.building.findUnique({ where: { id: buildingId } });
+  if (!building || building.inviteCode) return building;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      return await prisma.building.update({
+        where: { id: buildingId },
+        data: { inviteCode: generateInviteCode() },
+      });
+    } catch (err) {
+      if (err.code !== 'P2002') throw err; // unique clash on the code itself - retry with a new one
+    }
+  }
+  return building;
 }
 
 // Deterministic dual-ledger balance: opening balance + confirmed income - paid expenses,

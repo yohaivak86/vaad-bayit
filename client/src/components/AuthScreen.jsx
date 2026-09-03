@@ -2,9 +2,15 @@ import { useState } from 'react';
 import { Building2 } from 'lucide-react';
 import { api } from '../api';
 
+const MODES = [
+  { key: 'login', label: 'התחברות' },
+  { key: 'register', label: 'בניין חדש' },
+  { key: 'join', label: 'הצטרפות' },
+];
+
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [form, setForm] = useState({ email: '', password: '', name: '', buildingName: '', buildingAddress: '' });
+  const [mode, setMode] = useState('login');
+  const [form, setForm] = useState({ email: '', password: '', name: '', buildingName: '', buildingAddress: '', inviteCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,8 +24,11 @@ export default function AuthScreen({ onAuthenticated }) {
       if (mode === 'login') {
         const { user } = await api.login(form.email, form.password);
         onAuthenticated(user);
-      } else {
+      } else if (mode === 'register') {
         const res = await api.register(form);
+        onAuthenticated(res.user);
+      } else {
+        const res = await api.joinBuilding(form);
         onAuthenticated(res.user);
       }
     } catch (err) {
@@ -41,18 +50,16 @@ export default function AuthScreen({ onAuthenticated }) {
         </div>
 
         <div className="flex mb-4 rounded-lg bg-slate-100 p-1 text-sm font-medium">
-          <button
-            onClick={() => setMode('login')}
-            className={`flex-1 rounded-md py-1.5 transition ${mode === 'login' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
-          >
-            התחברות
-          </button>
-          <button
-            onClick={() => setMode('register')}
-            className={`flex-1 rounded-md py-1.5 transition ${mode === 'register' ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
-          >
-            בניין חדש
-          </button>
+          {MODES.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setMode(m.key)}
+              className={`flex-1 rounded-md py-1.5 transition ${mode === m.key ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
+            >
+              {m.label}
+            </button>
+          ))}
         </div>
 
         <form onSubmit={submit} className="space-y-3">
@@ -69,11 +76,29 @@ export default function AuthScreen({ onAuthenticated }) {
               </Field>
             </>
           )}
+
+          {mode === 'join' && (
+            <>
+              <Field label="קוד הזמנה לבניין">
+                <input
+                  value={form.inviteCode}
+                  onChange={(e) => set('inviteCode', e.target.value.toUpperCase())}
+                  className="input font-mono tracking-widest text-center"
+                  required
+                  placeholder="ABCD1234"
+                />
+              </Field>
+              <Field label="שם מלא">
+                <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
+              </Field>
+            </>
+          )}
+
           <Field label="אימייל">
             <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" required />
           </Field>
           <Field label="סיסמה">
-            <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className="input" required minLength={mode === 'register' ? 8 : undefined} />
+            <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className="input" required minLength={mode !== 'login' ? 8 : undefined} />
           </Field>
 
           {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
@@ -83,7 +108,7 @@ export default function AuthScreen({ onAuthenticated }) {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition"
           >
-            {loading ? 'רגע...' : mode === 'login' ? 'התחברות' : 'יצירת בניין וחשבון'}
+            {loading ? 'רגע...' : mode === 'login' ? 'התחברות' : mode === 'register' ? 'יצירת בניין וחשבון' : 'הצטרפות לבניין'}
           </button>
         </form>
       </div>

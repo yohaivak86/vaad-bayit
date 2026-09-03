@@ -19,6 +19,7 @@ export const api = {
   me: () => request('/auth/me'),
   login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  joinBuilding: (data) => request('/auth/join-building', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
 
   // Buildings (multi-tenant)
@@ -32,6 +33,19 @@ export const api = {
   getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
   addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
   removeBuildingAdmin: (buildingId, userId) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'DELETE' }),
+  regenerateInviteCode: (buildingId) => request(`/buildings/${buildingId}/invite-code/regenerate`, { method: 'POST' }),
+
+  // Complexes (multiple buildings sharing costs)
+  getMyComplexes: () => request('/complexes/mine'),
+  getComplex: (id) => request(`/complexes/${id}`),
+  createComplex: (data) => request('/complexes', { method: 'POST', body: JSON.stringify(data) }),
+  joinComplex: (data) => request('/complexes/join', { method: 'POST', body: JSON.stringify(data) }),
+  removeComplexMember: (id, buildingId) => request(`/complexes/${id}/members/${buildingId}`, { method: 'DELETE' }),
+  updateComplexShares: (id, shares) => request(`/complexes/${id}/shares`, { method: 'PUT', body: JSON.stringify({ shares }) }),
+  regenerateComplexCode: (id) => request(`/complexes/${id}/regenerate-code`, { method: 'POST' }),
+  getComplexExpenses: (id) => request(`/complexes/${id}/expenses`),
+  createComplexExpense: (id, data) => request(`/complexes/${id}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteComplexExpense: (id, expenseId) => request(`/complexes/${id}/expenses/${expenseId}`, { method: 'DELETE' }),
 
   // Tenants
   getTenants: (buildingId) => request(`/buildings/${buildingId}/tenants`),

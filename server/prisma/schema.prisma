@@ -15,6 +15,7 @@ model User {
   role           String          @default("BUILDING_ADMIN") // SUPER_ADMIN | BUILDING_ADMIN
   createdAt      DateTime        @default(now())
   buildingAdmins BuildingAdmin[]
+  ownedComplexes Complex[]
 }
 
 // Join table: which buildings a BUILDING_ADMIN user manages.
@@ -45,14 +46,63 @@ model Building {
   cleaningBenchmark     Decimal  @default(0) @db.Decimal(10, 2)
   gardeningBenchmark    Decimal  @default(0) @db.Decimal(10, 2)
   isConfigured          Boolean  @default(false)
+  inviteCode            String?  @unique // lets a new admin join this specific building without a super-admin; lazily backfilled
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  admins     BuildingAdmin[]
-  tenants    Tenant[]
-  tasks      Task[]
-  expenses   Expense[]
-  budgetItems BudgetItem[]
+  admins        BuildingAdmin[]
+  tenants       Tenant[]
+  tasks         Task[]
+  expenses      Expense[]
+  budgetItems   BudgetItem[]
+  complexMember ComplexMember?
+}
+
+// A complex (מתחם) groups several buildings that share costs (shared gardening,
+// shared parking, etc). Only its owner manages membership, splits and expenses;
+// member-building admins can view what's charged to their own building.
+model Complex {
+  id          Int      @id @default(autoincrement())
+  name        String
+  ownerId     Int
+  owner       User     @relation(fields: [ownerId], references: [id])
+  inviteCode  String   @unique
+  createdAt   DateTime @default(now())
+
+  members  ComplexMember[]
+  expenses ComplexExpense[]
+}
+
+// A building's membership in a complex, with an optional custom cost-share.
+// When sharePercent is null on every member of a complex, costs split equally;
+// when set, they must sum to 100 (enforced by the API, not the database).
+model ComplexMember {
+  id          Int      @id @default(autoincrement())
+  complexId   Int
+  complex     Complex  @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  buildingId  Int      @unique // a building belongs to at most one complex
+  building    Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  sharePercent Decimal? @db.Decimal(5, 2)
+  joinedAt    DateTime @default(now())
+
+  @@unique([complexId, buildingId])
+}
+
+// A shared complex-level cost (gardening, shared parking maintenance...). Creating
+// one fans out a proportional Expense row into every member building so each
+// building's own deterministic balance calculation picks it up automatically.
+model ComplexExpense {
+  id          Int      @id @default(autoincrement())
+  complexId   Int
+  complex     Complex  @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  date        DateTime
+  category    String
+  description String?
+  amount      Decimal  @db.Decimal(10, 2)
+  paidFrom    String // CASH | DIGITAL
+  createdAt   DateTime @default(now())
+
+  buildingExpenses Expense[]
 }
 
 model Tenant {
@@ -105,17 +155,19 @@ model Task {
 }
 
 model Expense {
-  id           Int      @id @default(autoincrement())
-  buildingId   Int
-  building     Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  date         DateTime
-  category     String
-  description  String?
-  supplierName String?
-  amount       Decimal  @db.Decimal(10, 2)
-  paidFrom     String // CASH | DIGITAL
-  receiptUrl   String?
-  createdAt    DateTime @default(now())
+  id               Int             @id @default(autoincrement())
+  buildingId       Int
+  building         Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  date             DateTime
+  category         String
+  description      String?
+  supplierName     String?
+  amount           Decimal         @db.Decimal(10, 2)
+  paidFrom         String // CASH | DIGITAL
+  receiptUrl       String?
+  createdAt        DateTime        @default(now())
+  complexExpenseId Int? // set when this row was auto-generated from a shared ComplexExpense
+  complexExpense   ComplexExpense? @relation(fields: [complexExpenseId], references: [id], onDelete: Cascade)
 }
 
 model BudgetItem {

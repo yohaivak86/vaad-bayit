@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { hashPassword } = require('../lib/auth');
 const { requireAuth } = require('../middleware/auth');
+const { generateInviteCode } = require('../lib/inviteCode');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.post('/', requireAuth, async (req, res) => {
 
   const email = adminEmail.toLowerCase();
   const result = await prisma.$transaction(async (tx) => {
-    const building = await tx.building.create({ data: { name, address: address || '' } });
+    const building = await tx.building.create({ data: { name, address: address || '', inviteCode: generateInviteCode() } });
 
     let user = await tx.user.findUnique({ where: { email } });
     if (!user) {

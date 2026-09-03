@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { X, Trash2, UserPlus } from 'lucide-react';
+import { X, Trash2, UserPlus, Copy, RefreshCw, Check } from 'lucide-react';
 import { api } from '../api';
 
-export default function ManageAdminsModal({ buildingId, currentUserId, onClose }) {
+export default function ManageAdminsModal({ buildingId, currentUserId, building, onClose }) {
   const [admins, setAdmins] = useState(null);
   const [form, setForm] = useState({ email: '', name: '', password: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [inviteCode, setInviteCode] = useState(building?.inviteCode || '');
+  const [copied, setCopied] = useState(false);
 
   const load = async () => setAdmins(await api.getBuildingAdmins(buildingId));
   useEffect(() => { load(); }, [buildingId]);
@@ -37,6 +39,21 @@ export default function ManageAdminsModal({ buildingId, currentUserId, onClose }
     }
   };
 
+  const copyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable - ignore, the code is still selectable on screen */
+    }
+  };
+
+  const regenerateCode = async () => {
+    const res = await api.regenerateInviteCode(buildingId);
+    setInviteCode(res.inviteCode);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col">
@@ -46,6 +63,24 @@ export default function ManageAdminsModal({ buildingId, currentUserId, onClose }
         </div>
 
         <div className="overflow-y-auto px-5 py-4 flex-1 space-y-4">
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-3">
+            <p className="text-xs font-semibold text-blue-800 mb-1.5">קוד הזמנה לבניין</p>
+            <p className="text-[11px] text-blue-700 mb-2">
+              כל מי שנרשם עם הקוד הזה (בטאב "הצטרפות" במסך ההתחברות) יצטרף כאדמין לבניין הזה.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="flex-1 font-mono tracking-widest text-center bg-white border border-blue-200 rounded-lg py-1.5 text-sm text-blue-900">
+                {inviteCode}
+              </span>
+              <button onClick={copyCode} className="p-2 rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-100" title="העתקה">
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+              </button>
+              <button onClick={regenerateCode} className="p-2 rounded-lg bg-white border border-blue-200 text-blue-700 hover:bg-blue-100" title="יצירת קוד חדש">
+                <RefreshCw size={15} />
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-2">
             {admins === null && <p className="text-sm text-slate-500">טוען...</p>}
             {admins?.map((a) => (
@@ -65,7 +100,7 @@ export default function ManageAdminsModal({ buildingId, currentUserId, onClose }
 
           <form onSubmit={submit} className="border-t border-slate-100 pt-4 space-y-3">
             <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-              <UserPlus size={14} /> הוספת אדמין לבניין
+              <UserPlus size={14} /> או להוסיף אדמין ישירות (עם סיסמה שאת קובעת)
             </p>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">שם מלא</label>

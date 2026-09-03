@@ -134,7 +134,7 @@ export default function App() {
         <ApprovePaymentModal buildingId={buildingId} onClose={() => setShowApprovePayment(false)} onApproved={refreshBalance} />
       )}
       {showManageAdmins && (
-        <ManageAdminsModal buildingId={buildingId} currentUserId={user.id} onClose={() => setShowManageAdmins(false)} />
+        <ManageAdminsModal buildingId={buildingId} currentUserId={user.id} building={building} onClose={() => setShowManageAdmins(false)} />
       )}
     </div>
   );

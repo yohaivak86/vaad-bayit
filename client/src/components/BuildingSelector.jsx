@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Building2, ChevronLeft, LogOut, Plus, X } from 'lucide-react';
+import { Building2, ChevronLeft, LogOut, Plus, X, Users2 } from 'lucide-react';
 import { api } from '../api';
+import ComplexesModal from './ComplexesModal';
 
 export default function BuildingSelector({ user, buildings, onSelect, onLogout, onBuildingsChanged }) {
   const [showCreate, setShowCreate] = useState(false);
+  const [showComplexes, setShowComplexes] = useState(false);
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 px-4 py-8">
@@ -50,6 +52,15 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
             <Plus size={16} /> הוספת בניין חדש
           </button>
         )}
+
+        {buildings.length > 0 && (
+          <button
+            onClick={() => setShowComplexes(true)}
+            className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
+          >
+            <Users2 size={16} /> מתחמים (בניינים משותפים)
+          </button>
+        )}
       </div>
 
       {showCreate && (
@@ -57,6 +68,9 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
           onClose={() => setShowCreate(false)}
           onCreated={async () => { setShowCreate(false); await onBuildingsChanged(); }}
         />
+      )}
+      {showComplexes && (
+        <ComplexesModal myBuildings={buildings} onClose={() => setShowComplexes(false)} />
       )}
     </div>
   );

@@ -13,6 +13,7 @@ const duesRoutes = require('./routes/dues');
 const tasksRoutes = require('./routes/tasks');
 const expensesRoutes = require('./routes/expenses');
 const budgetRoutes = require('./routes/budget');
+const complexesRoutes = require('./routes/complexes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -23,6 +24,7 @@ app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/buildings', buildingsListRoutes);
+app.use('/api/complexes', complexesRoutes);
 
 // Every building-scoped resource lives under /api/buildings/:buildingId/... and requires
 // the caller to be authenticated and to have access to that specific building.

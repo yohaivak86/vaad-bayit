@@ -2,6 +2,7 @@ const express = require('express');
 const prisma = require('../lib/prisma');
 const { getBuilding, getBalance } = require('../lib/calc');
 const { hashPassword } = require('../lib/auth');
+const { generateInviteCode } = require('../lib/inviteCode');
 
 const router = express.Router({ mergeParams: true });
 
@@ -42,6 +43,22 @@ router.put('/', async (req, res) => {
 router.get('/balance', async (req, res) => {
   const balance = await getBalance(req.buildingId);
   res.json(balance);
+});
+
+// Invalidates the current invite code (e.g. if it leaked) and issues a fresh one.
+router.post('/invite-code/regenerate', async (req, res) => {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const updated = await prisma.building.update({
+        where: { id: req.buildingId },
+        data: { inviteCode: generateInviteCode() },
+      });
+      return res.json({ inviteCode: updated.inviteCode });
+    } catch (err) {
+      if (err.code !== 'P2002') throw err;
+    }
+  }
+  res.status(500).json({ error: 'לא הצלחנו ליצור קוד הזמנה, נסו שוב' });
 });
 
 // Co-admins of this specific building (a committee typically has more than one member).
