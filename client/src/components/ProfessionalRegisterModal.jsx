@@ -4,7 +4,7 @@ import { api } from '../api';
 import { PROFESSION_CATEGORIES } from '../constants';
 
 export default function ProfessionalRegisterModal({ onClose }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', profession: PROFESSION_CATEGORIES[0], message: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', profession: PROFESSION_CATEGORIES[0], message: '', marketingConsent: false });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -61,13 +61,25 @@ export default function ProfessionalRegisterModal({ onClose }) {
               <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" required placeholder="050-1234567" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">אימייל (אופציונלי)</label>
-              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" />
+              <label className="block text-sm font-medium text-slate-600 mb-1">אימייל</label>
+              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">כמה מילים על השירות (אופציונלי)</label>
               <textarea value={form.message} onChange={(e) => set('message', e.target.value)} className="input" rows={3} />
             </div>
+            <label className="flex items-start gap-2 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={form.marketingConsent}
+                onChange={(e) => set('marketingConsent', e.target.checked)}
+                className="mt-0.5"
+                required
+              />
+              <span>
+                אני מאשר/ת קבלת עדכונים והתראות (Push) על עבודות פתוחות, מבצעים ושיתופי פעולה עם קבלנים - חובה להצטרפות
+              </span>
+            </label>
             {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             <button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
               {saving ? 'שולח...' : 'שליחת הרשמה'}

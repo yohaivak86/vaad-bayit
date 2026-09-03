@@ -7,12 +7,12 @@ const { generateInviteCode } = require('../lib/inviteCode');
 const router = express.Router();
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role };
+  return { id: user.id, email: user.email, name: user.name, phone: user.phone, role: user.role };
 }
 
-async function createUserAccount(tx, { email, password, name }) {
-  if (!email || !password || !name) {
-    throw Object.assign(new Error('email, password ו-name הם שדות חובה'), { status: 400 });
+async function createUserAccount(tx, { email, password, name, phone, marketingConsent }) {
+  if (!email || !password || !name || !phone) {
+    throw Object.assign(new Error('email, password, name ו-phone הם שדות חובה'), { status: 400 });
   }
   if (password.length < 8) {
     throw Object.assign(new Error('הסיסמה חייבת להכיל לפחות 8 תווים'), { status: 400 });
@@ -22,19 +22,19 @@ async function createUserAccount(tx, { email, password, name }) {
   if (existing) throw Object.assign(new Error('כתובת האימייל כבר רשומה במערכת'), { status: 409 });
 
   return tx.user.create({
-    data: { email: normalizedEmail, passwordHash: await hashPassword(password), name, role: 'BUILDING_ADMIN' },
+    data: { email: normalizedEmail, passwordHash: await hashPassword(password), name, phone, role: 'BUILDING_ADMIN', marketingConsent: Boolean(marketingConsent) },
   });
 }
 
 // Self-service signup: creates a brand-new building together with its first admin.
 router.post('/register', async (req, res) => {
-  const { email, password, name, buildingName, buildingAddress } = req.body;
+  const { email, password, name, phone, buildingName, buildingAddress, marketingConsent } = req.body;
   if (!buildingName) return res.status(400).json({ error: 'buildingName הוא שדה חובה' });
 
   let result;
   try {
     result = await prisma.$transaction(async (tx) => {
-      const user = await createUserAccount(tx, { email, password, name });
+      const user = await createUserAccount(tx, { email, password, name, phone, marketingConsent });
       const building = await tx.building.create({
         data: { name: buildingName, address: buildingAddress || '', inviteCode: generateInviteCode() },
       });
@@ -55,7 +55,7 @@ router.post('/register', async (req, res) => {
 // The membership starts PENDING - an existing admin of that building must approve it
 // (and choose its role) before the new user gets any access.
 router.post('/join-building', async (req, res) => {
-  const { email, password, name, inviteCode } = req.body;
+  const { email, password, name, phone, inviteCode, marketingConsent } = req.body;
   if (!inviteCode) return res.status(400).json({ error: 'inviteCode הוא שדה חובה' });
 
   const building = await prisma.building.findUnique({ where: { inviteCode: inviteCode.toUpperCase().trim() } });
@@ -64,7 +64,7 @@ router.post('/join-building', async (req, res) => {
   let user;
   try {
     user = await prisma.$transaction(async (tx) => {
-      const newUser = await createUserAccount(tx, { email, password, name });
+      const newUser = await createUserAccount(tx, { email, password, name, phone, marketingConsent });
       await tx.buildingAdmin.create({ data: { userId: newUser.id, buildingId: building.id, status: 'PENDING' } });
       return newUser;
     });

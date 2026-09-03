@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { title, description, location, urgency, attachmentUrl, isRecurring, recurrenceLabel } = req.body;
+  const { title, description, location, urgency, attachmentUrl, isRecurring, recurrenceLabel, cost, paidFrom } = req.body;
   if (!title) return res.status(400).json({ error: 'title is required' });
   const task = await prisma.task.create({
     data: {
@@ -25,6 +25,8 @@ router.post('/', async (req, res) => {
       attachmentUrl: attachmentUrl || null,
       isRecurring: Boolean(isRecurring),
       recurrenceLabel: recurrenceLabel || null,
+      cost: cost !== undefined && cost !== null && cost !== '' ? Number(cost) : null,
+      paidFrom: cost !== undefined && cost !== null && cost !== '' ? paidFrom || null : null,
     },
   });
   res.status(201).json(task);
@@ -35,13 +37,15 @@ router.put('/:id', async (req, res) => {
   const existing = await prisma.task.findFirst({ where: { id, buildingId: req.buildingId } });
   if (!existing) return res.status(404).json({ error: 'משימה לא נמצאה' });
 
-  const { title, description, location, urgency, status, attachmentUrl } = req.body;
+  const { title, description, location, urgency, status, attachmentUrl, cost, paidFrom } = req.body;
   const data = {
     ...(title !== undefined && { title }),
     ...(description !== undefined && { description }),
     ...(location !== undefined && { location }),
     ...(urgency !== undefined && { urgency }),
     ...(attachmentUrl !== undefined && { attachmentUrl }),
+    ...(cost !== undefined && { cost: cost === null || cost === '' ? null : Number(cost) }),
+    ...(paidFrom !== undefined && { paidFrom: paidFrom || null }),
   };
   if (status !== undefined) {
     data.status = status;

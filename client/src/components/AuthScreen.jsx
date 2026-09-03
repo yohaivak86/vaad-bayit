@@ -11,7 +11,7 @@ const MODES = [
 
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', buildingName: '', buildingAddress: '', inviteCode: '' });
+  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', buildingName: '', buildingAddress: '', inviteCode: '', marketingConsent: false });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -88,6 +88,9 @@ export default function AuthScreen({ onAuthenticated }) {
               <Field label="שם מלא">
                 <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
               </Field>
+              <Field label="טלפון">
+                <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" required placeholder="050-1234567" />
+              </Field>
             </>
           )}
 
@@ -105,6 +108,9 @@ export default function AuthScreen({ onAuthenticated }) {
               <Field label="שם מלא">
                 <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
               </Field>
+              <Field label="טלפון">
+                <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" required placeholder="050-1234567" />
+              </Field>
             </>
           )}
 
@@ -114,6 +120,18 @@ export default function AuthScreen({ onAuthenticated }) {
           <Field label="סיסמה">
             <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className="input" required minLength={mode !== 'login' ? 8 : undefined} />
           </Field>
+
+          {mode !== 'login' && (
+            <label className="flex items-start gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={form.marketingConsent}
+                onChange={(e) => set('marketingConsent', e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>אני מעוניין/ת לקבל עדכונים והתראות מהמערכת (אופציונלי)</span>
+            </label>
+          )}
 
           {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Plus, X, MapPin, AlertTriangle, CheckSquare, Trash2 } from 'lucide-react';
+import { Plus, X, MapPin, AlertTriangle, CheckSquare, Trash2, Banknote, Pencil } from 'lucide-react';
 import { api } from '../../api';
-import { TASK_STATUSES, RECURRING_CHECKLIST } from '../../constants';
-import { formatDateHe } from '../../format';
+import { TASK_STATUSES, RECURRING_CHECKLIST, PAID_FROM_OPTIONS } from '../../constants';
+import { formatDateHe, formatILS } from '../../format';
 
 export default function TasksTab({ buildingId, readOnly }) {
   const [tasks, setTasks] = useState(null);
@@ -24,6 +24,11 @@ export default function TasksTab({ buildingId, readOnly }) {
 
   const addRecurring = async (label) => {
     await api.createTask(buildingId, { title: label, isRecurring: true, recurrenceLabel: label, urgency: 'רגיל' });
+    await load();
+  };
+
+  const saveCost = async (task, cost, paidFrom) => {
+    await api.updateTask(buildingId, task.id, { cost, paidFrom });
     await load();
   };
 
@@ -72,7 +77,7 @@ export default function TasksTab({ buildingId, readOnly }) {
       {!tasks && <p className="text-sm text-slate-500">טוען...</p>}
       <div className="space-y-2">
         {filtered.map((task) => (
-          <TaskCard key={task.id} task={task} onStatusChange={updateStatus} onDelete={remove} readOnly={readOnly} />
+          <TaskCard key={task.id} task={task} onStatusChange={updateStatus} onDelete={remove} onSaveCost={saveCost} readOnly={readOnly} />
         ))}
         {tasks && filtered.length === 0 && <p className="text-sm text-slate-400 text-center py-8">אין משימות בסטטוס זה</p>}
       </div>
@@ -100,7 +105,10 @@ function FilterChip({ label, active, onClick }) {
   );
 }
 
-function TaskCard({ task, onStatusChange, onDelete, readOnly }) {
+function TaskCard({ task, onStatusChange, onDelete, onSaveCost, readOnly }) {
+  const [showCostForm, setShowCostForm] = useState(false);
+  const paidFromLabel = PAID_FROM_OPTIONS.find((o) => o.value === task.paidFrom)?.label;
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -124,6 +132,7 @@ function TaskCard({ task, onStatusChange, onDelete, readOnly }) {
           </button>
         )}
       </div>
+
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
         {TASK_STATUSES.map((s) => (
           <button
@@ -137,6 +146,92 @@ function TaskCard({ task, onStatusChange, onDelete, readOnly }) {
             {s.label}
           </button>
         ))}
+
+        {task.cost != null ? (
+          <button
+            onClick={() => !readOnly && setShowCostForm(true)}
+            disabled={readOnly}
+            className={`flex items-center gap-1 text-[11px] rounded-md px-2 py-1 font-medium bg-emerald-50 text-emerald-700 ${readOnly ? 'cursor-default' : 'hover:bg-emerald-100'}`}
+          >
+            <Banknote size={11} /> {formatILS(task.cost)}{paidFromLabel ? ` · ${paidFromLabel}` : ''}
+          </button>
+        ) : (
+          !readOnly && (
+            <button
+              onClick={() => setShowCostForm(true)}
+              className="flex items-center gap-1 text-[11px] rounded-md px-2 py-1 font-medium border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
+            >
+              <Banknote size={11} /> הוספת עלות
+            </button>
+          )
+        )}
+      </div>
+
+      {showCostForm && (
+        <TaskCostFormModal
+          task={task}
+          onClose={() => setShowCostForm(false)}
+          onSave={async (cost, paidFrom) => { await onSaveCost(task, cost, paidFrom); setShowCostForm(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function TaskCostFormModal({ task, onClose, onSave }) {
+  const [cost, setCost] = useState(task.cost ?? '');
+  const [paidFrom, setPaidFrom] = useState(task.paidFrom || 'BANK');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      await onSave(cost === '' ? null : Number(cost), cost === '' ? null : paidFrom);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <h2 className="font-bold text-lg text-slate-800 flex items-center gap-1.5"><Pencil size={16} /> עלות המשימה</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
+        </div>
+        <form onSubmit={submit} className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">עלות (₪)</label>
+            <input type="number" step="0.01" min="0" value={cost} onChange={(e) => setCost(e.target.value)} className="input" placeholder="השאירו ריק להסרת העלות" />
+          </div>
+          {cost !== '' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">שולם / ישולם מתוך</label>
+              <div className="flex gap-2">
+                {PAID_FROM_OPTIONS.map((opt) => (
+                  <button
+                    type="button"
+                    key={opt.value}
+                    onClick={() => setPaidFrom(opt.value)}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
+                      paidFrom === opt.value ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="text-[11px] text-slate-400">זהו שדה מידע בלבד - הוא לא נרשם אוטומטית בטאב "הוצאות ותנועות".</p>
+          <div className="pt-1 flex gap-2">
+            <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
+              {saving ? 'שומר...' : 'שמירה'}
+            </button>
+            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">ביטול</button>
+          </div>
+        </form>
       </div>
     </div>
   );

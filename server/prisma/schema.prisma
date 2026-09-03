@@ -12,7 +12,9 @@ model User {
   email          String          @unique
   passwordHash   String
   name           String
+  phone          String?
   role           String          @default("BUILDING_ADMIN") // SUPER_ADMIN | BUILDING_ADMIN
+  marketingConsent Boolean       @default(false) // optional for building admins, unlike Professional where it's required
   createdAt      DateTime        @default(now())
   buildingAdmins BuildingAdmin[]
   ownedComplexes Complex[]
@@ -22,13 +24,14 @@ model User {
 // platform. No login account - just a lead, browsable by building admins as a directory.
 // Track/plan selection (מסלולים) and any paywall are deliberately not modeled yet.
 model Professional {
-  id         Int      @id @default(autoincrement())
-  name       String
-  phone      String
-  email      String?
-  profession String
-  message    String?
-  createdAt  DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  name             String
+  phone            String
+  email            String
+  profession       String
+  message          String?
+  marketingConsent Boolean  @default(false) // required at signup - push about open jobs/deals/contractor collabs
+  createdAt        DateTime @default(now())
 }
 
 // Single-row site-wide configuration (not per-building). Always id 1.
@@ -206,6 +209,8 @@ model Task {
   attachmentUrl   String?
   isRecurring     Boolean   @default(false)
   recurrenceLabel String?
+  cost            Decimal?  @db.Decimal(10, 2) // informational - not auto-posted to the expense ledger
+  paidFrom        String? // CASH | BANK | PAYBOX, only meaningful when cost is set
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   resolvedAt      DateTime?
