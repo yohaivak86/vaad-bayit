@@ -10,6 +10,12 @@ export const EXPENSE_CATEGORIES = [
   'שונות',
 ];
 
+export const PAID_FROM_OPTIONS = [
+  { value: 'CASH', label: 'מזומן' },
+  { value: 'BANK', label: 'בנק' },
+  { value: 'PAYBOX', label: 'PayBox' },
+];
+
 export const TASK_STATUSES = [
   { value: 'OPEN', label: 'פתוח', color: 'bg-red-100 text-red-700' },
   { value: 'IN_PROGRESS', label: 'בטיפול', color: 'bg-amber-100 text-amber-700' },

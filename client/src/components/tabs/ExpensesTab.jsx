@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, Printer, Filter, Paperclip, X, Upload } from 'lucide-react';
 import { api } from '../../api';
-import { EXPENSE_CATEGORIES } from '../../constants';
+import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../../constants';
 import { formatILS, formatDateHe } from '../../format';
 
 function firstOfMonth() {
@@ -68,8 +68,7 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
             <label className="block text-[11px] text-slate-500 mb-1">מקור תשלום</label>
             <select value={filters.paidFrom} onChange={(e) => setFilters((f) => ({ ...f, paidFrom: e.target.value }))} className="input">
               <option value="">הכל</option>
-              <option value="DIGITAL">בנק / PayBox</option>
-              <option value="CASH">מזומן</option>
+              {PAID_FROM_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
             </select>
           </div>
         </div>
@@ -81,10 +80,11 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
           <p className="text-sm text-slate-500">דו"ח הוצאות: {filters.from} עד {filters.to}</p>
         </div>
         <p className="text-xs font-semibold text-slate-500 mb-2">סיכום לתקופה שנבחרה</p>
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <SummaryBox label='סה"כ הוצאות' value={formatILS(summary?.total)} />
           <SummaryBox label="מזומן" value={formatILS(summary?.byPaidFrom?.CASH)} />
-          <SummaryBox label="בנק / PayBox" value={formatILS(summary?.byPaidFrom?.DIGITAL)} />
+          <SummaryBox label="בנק" value={formatILS(summary?.byPaidFrom?.BANK)} />
+          <SummaryBox label="PayBox" value={formatILS(summary?.byPaidFrom?.PAYBOX)} />
         </div>
         {summary && Object.keys(summary.byCategory).length > 0 && (
           <div className="space-y-1.5 mb-1">
@@ -124,7 +124,7 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
                   <td className="px-3 py-2 whitespace-nowrap">{formatDateHe(e.date)}</td>
                   <td className="px-3 py-2">{e.category}</td>
                   <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{e.supplierName || '—'}</td>
-                  <td className="px-3 py-2">{e.paidFrom === 'CASH' ? 'מזומן' : 'בנק'}</td>
+                  <td className="px-3 py-2">{PAID_FROM_OPTIONS.find((o) => o.value === e.paidFrom)?.label || e.paidFrom}</td>
                   <td className="px-3 py-2 font-medium">{formatILS(e.amount)}</td>
                   <td className="px-3 py-2 no-print">
                     <button

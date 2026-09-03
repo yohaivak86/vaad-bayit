@@ -81,6 +81,16 @@ router.post('/:id/mark-bank', async (req, res) => {
   res.json(due);
 });
 
+router.post('/:id/mark-paybox', async (req, res) => {
+  const id = Number(req.params.id);
+  if (!(await findOwnedDue(req.buildingId, id))) return res.status(404).json({ error: 'רשומה לא נמצאה' });
+  const due = await prisma.due.update({
+    where: { id },
+    data: { status: 'PAID_PAYBOX', paidDate: new Date() },
+  });
+  res.json(due);
+});
+
 router.post('/:id/mark-unpaid', async (req, res) => {
   const id = Number(req.params.id);
   if (!(await findOwnedDue(req.buildingId, id))) return res.status(404).json({ error: 'רשומה לא נמצאה' });

@@ -6,12 +6,14 @@ import { formatILS, MONTHS_HE } from '../../format';
 const STATUS_STYLE = {
   UNPAID: 'bg-red-100 text-red-700 border-red-200',
   PAID_BANK: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  PAID_PAYBOX: 'bg-purple-100 text-purple-700 border-purple-200',
   PAID_CASH: 'bg-blue-100 text-blue-700 border-blue-200',
   PENDING_CASH_APPROVAL: 'bg-amber-100 text-amber-700 border-amber-200',
 };
 const STATUS_LABEL = {
   UNPAID: 'לא שולם',
   PAID_BANK: 'שולם בבנק',
+  PAID_PAYBOX: 'שולם ב-PayBox',
   PAID_CASH: 'שולם במזומן',
   PENDING_CASH_APPROVAL: 'ממתין לאישור',
 };
@@ -205,6 +207,7 @@ function DueMenu({ due, onClose, onAction }) {
         <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X size={13} /></button>
       </div>
       <MenuItem onClick={() => onAction(api.markBank, due)}>סימון כשולם בבנק</MenuItem>
+      <MenuItem onClick={() => onAction(api.markPaybox, due)}>סימון כשולם ב-PayBox</MenuItem>
       {due.status === 'PENDING_CASH_APPROVAL' ? (
         <MenuItem onClick={() => onAction(api.approveCash, due)}>אישור תשלום מזומן</MenuItem>
       ) : (

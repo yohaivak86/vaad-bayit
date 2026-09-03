@@ -48,7 +48,7 @@ router.get('/summary', async (req, res) => {
   for (const e of expenses) {
     byCategory[e.category] = round2((byCategory[e.category] || 0) + toNum(e.amount));
   }
-  const byPaidFrom = { CASH: 0, DIGITAL: 0 };
+  const byPaidFrom = { CASH: 0, BANK: 0, PAYBOX: 0 };
   for (const e of expenses) {
     byPaidFrom[e.paidFrom] = round2((byPaidFrom[e.paidFrom] || 0) + toNum(e.amount));
   }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Paperclip } from 'lucide-react';
-import { EXPENSE_CATEGORIES } from '../constants';
+import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../constants';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -11,7 +11,7 @@ export default function AddExpenseModal({ onClose, onSave }) {
     description: '',
     supplierName: '',
     amount: '',
-    paidFrom: 'DIGITAL',
+    paidFrom: 'BANK',
     receiptUrl: '',
   });
   const [receiptFile, setReceiptFile] = useState(null);
@@ -60,16 +60,13 @@ export default function AddExpenseModal({ onClose, onSave }) {
           </Field>
           <Field label="שולם מתוך">
             <div className="flex gap-2">
-              {[
-                { v: 'DIGITAL', label: 'בנק / PayBox' },
-                { v: 'CASH', label: 'מזומן' },
-              ].map((opt) => (
+              {PAID_FROM_OPTIONS.map((opt) => (
                 <button
                   type="button"
-                  key={opt.v}
-                  onClick={() => set('paidFrom', opt.v)}
+                  key={opt.value}
+                  onClick={() => set('paidFrom', opt.value)}
                   className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
-                    form.paidFrom === opt.v ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
+                    form.paidFrom === opt.value ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
                   }`}
                 >
                   {opt.label}

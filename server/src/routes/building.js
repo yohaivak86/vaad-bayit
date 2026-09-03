@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   const {
     name, address, floors, apartmentsCount, monthlyFeeDefault,
-    openingBalanceCash, openingBalanceDigital, openingBalanceDate,
+    openingBalanceCash, openingBalanceBank, openingBalancePaybox, openingBalanceDate,
     elevatorsCount, electricityBenchmark, cleaningBenchmark, gardeningBenchmark,
   } = req.body;
 
@@ -28,7 +28,8 @@ router.put('/', async (req, res) => {
       ...(apartmentsCount !== undefined && { apartmentsCount: Number(apartmentsCount) }),
       ...(monthlyFeeDefault !== undefined && { monthlyFeeDefault: Number(monthlyFeeDefault) }),
       ...(openingBalanceCash !== undefined && { openingBalanceCash: Number(openingBalanceCash) }),
-      ...(openingBalanceDigital !== undefined && { openingBalanceDigital: Number(openingBalanceDigital) }),
+      ...(openingBalanceBank !== undefined && { openingBalanceBank: Number(openingBalanceBank) }),
+      ...(openingBalancePaybox !== undefined && { openingBalancePaybox: Number(openingBalancePaybox) }),
       ...(openingBalanceDate !== undefined && { openingBalanceDate: new Date(openingBalanceDate) }),
       ...(elevatorsCount !== undefined && { elevatorsCount: Number(elevatorsCount) }),
       ...(electricityBenchmark !== undefined && { electricityBenchmark: Number(electricityBenchmark) }),

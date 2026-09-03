@@ -73,6 +73,7 @@ export const api = {
   reportCash: (buildingId, id) => request(`/buildings/${buildingId}/dues/${id}/report-cash`, { method: 'POST' }),
   approveCash: (buildingId, id) => request(`/buildings/${buildingId}/dues/${id}/approve-cash`, { method: 'POST' }),
   markBank: (buildingId, id) => request(`/buildings/${buildingId}/dues/${id}/mark-bank`, { method: 'POST' }),
+  markPaybox: (buildingId, id) => request(`/buildings/${buildingId}/dues/${id}/mark-paybox`, { method: 'POST' }),
   markUnpaid: (buildingId, id) => request(`/buildings/${buildingId}/dues/${id}/mark-unpaid`, { method: 'POST' }),
 
   // Tasks

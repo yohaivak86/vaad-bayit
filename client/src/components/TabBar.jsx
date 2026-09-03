@@ -12,7 +12,7 @@ export default function TabBar({ active, onChange, readOnly }) {
   const TABS = ALL_TABS.filter((t) => !readOnly || !t.adminOnly);
   return (
     <div className="no-print">
-      <div className="hidden sm:flex max-w-6xl mx-auto px-4 gap-1 border-b border-slate-200 bg-white sticky top-[164px] z-20">
+      <div className="hidden sm:flex max-w-6xl mx-auto px-4 gap-1 border-b border-slate-200 bg-white sticky top-[208px] z-20">
         {TABS.map((t) => (
           <TabButton key={t.key} tab={t} active={active === t.key} onClick={() => onChange(t.key)} />
         ))}

@@ -1,4 +1,4 @@
-import { Building2, Wallet, Banknote, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye } from 'lucide-react';
+import { Building2, Wallet, Landmark, Smartphone, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye } from 'lucide-react';
 import { formatILS } from '../format';
 
 export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onSwitchBuilding, showSwitch, onLogout, readOnly }) {
@@ -60,8 +60,9 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <SummaryCard icon={Banknote} label="יתרת בנק / PayBox" value={balance?.digitalBalance} color="blue" />
+        <div className="grid grid-cols-2 gap-2 mt-3">
+          <SummaryCard icon={Landmark} label="יתרת בנק" value={balance?.bankBalance} color="blue" />
+          <SummaryCard icon={Smartphone} label="יתרת PayBox" value={balance?.payboxBalance} color="purple" />
           <SummaryCard icon={PiggyBank} label="יתרת קופת מזומן" value={balance?.cashBalance} color="amber" />
           <SummaryCard icon={Wallet} label='סה"כ קופה כללית' value={balance?.totalBalance} color="emerald" bold />
         </div>
@@ -91,6 +92,7 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
 
 const COLOR_MAP = {
   blue: 'bg-blue-50 text-blue-700 border-blue-100',
+  purple: 'bg-purple-50 text-purple-700 border-purple-100',
   amber: 'bg-amber-50 text-amber-700 border-amber-100',
   emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
 };

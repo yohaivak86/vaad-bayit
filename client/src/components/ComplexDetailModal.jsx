@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, Copy, RefreshCw, Check, Trash2, Plus, Scale } from 'lucide-react';
 import { api } from '../api';
 import { formatILS, formatDateHe } from '../format';
-import { EXPENSE_CATEGORIES } from '../constants';
+import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../constants';
 
 export default function ComplexDetailModal({ complexId, onClose, onChanged }) {
   const [complex, setComplex] = useState(null);
@@ -205,7 +205,7 @@ function round1(n) {
 
 function ComplexExpenseFormModal({ onClose, onSave }) {
   const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({ date: today, category: EXPENSE_CATEGORIES[0], description: '', amount: '', paidFrom: 'DIGITAL' });
+  const [form, setForm] = useState({ date: today, category: EXPENSE_CATEGORIES[0], description: '', amount: '', paidFrom: 'BANK' });
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -249,13 +249,13 @@ function ComplexExpenseFormModal({ onClose, onSave }) {
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">שולם מתוך</label>
             <div className="flex gap-2">
-              {[{ v: 'DIGITAL', label: 'בנק / PayBox' }, { v: 'CASH', label: 'מזומן' }].map((opt) => (
+              {PAID_FROM_OPTIONS.map((opt) => (
                 <button
                   type="button"
-                  key={opt.v}
-                  onClick={() => set('paidFrom', opt.v)}
+                  key={opt.value}
+                  onClick={() => set('paidFrom', opt.value)}
                   className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
-                    form.paidFrom === opt.v ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
+                    form.paidFrom === opt.value ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
                   }`}
                 >
                   {opt.label}

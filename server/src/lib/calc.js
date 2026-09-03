@@ -28,36 +28,31 @@ async function getBuilding(buildingId) {
   return building;
 }
 
-// Deterministic dual-ledger balance: opening balance + confirmed income - paid expenses,
-// computed separately per ledger (digital / cash) and never mixed.
+// Deterministic triple-ledger balance: opening balance + confirmed income - paid expenses,
+// computed separately per ledger (bank / PayBox / cash) and never mixed. Kept as three
+// distinct ledgers (rather than one combined "digital" pool) so each can later be
+// reconciled automatically against its own real source - a bank feed and a PayBox group.
 async function getBalance(buildingId) {
   const building = await getBuilding(buildingId);
 
-  const [digitalDuesSum, cashDuesSum, digitalExpSum, cashExpSum] = await Promise.all([
-    prisma.due.aggregate({
-      where: { status: 'PAID_BANK', tenant: { buildingId } },
-      _sum: { amountDue: true },
-    }),
-    prisma.due.aggregate({
-      where: { status: 'PAID_CASH', tenant: { buildingId } },
-      _sum: { amountDue: true },
-    }),
-    prisma.expense.aggregate({ where: { buildingId, paidFrom: 'DIGITAL' }, _sum: { amount: true } }),
+  const [bankDuesSum, payboxDuesSum, cashDuesSum, bankExpSum, payboxExpSum, cashExpSum] = await Promise.all([
+    prisma.due.aggregate({ where: { status: 'PAID_BANK', tenant: { buildingId } }, _sum: { amountDue: true } }),
+    prisma.due.aggregate({ where: { status: 'PAID_PAYBOX', tenant: { buildingId } }, _sum: { amountDue: true } }),
+    prisma.due.aggregate({ where: { status: 'PAID_CASH', tenant: { buildingId } }, _sum: { amountDue: true } }),
+    prisma.expense.aggregate({ where: { buildingId, paidFrom: 'BANK' }, _sum: { amount: true } }),
+    prisma.expense.aggregate({ where: { buildingId, paidFrom: 'PAYBOX' }, _sum: { amount: true } }),
     prisma.expense.aggregate({ where: { buildingId, paidFrom: 'CASH' }, _sum: { amount: true } }),
   ]);
 
-  const digitalIncome = toNum(digitalDuesSum._sum.amountDue);
-  const cashIncome = toNum(cashDuesSum._sum.amountDue);
-  const digitalExpense = toNum(digitalExpSum._sum.amount);
-  const cashExpense = toNum(cashExpSum._sum.amount);
-
-  const digitalBalance = toNum(building.openingBalanceDigital) + digitalIncome - digitalExpense;
-  const cashBalance = toNum(building.openingBalanceCash) + cashIncome - cashExpense;
+  const bankBalance = toNum(building.openingBalanceBank) + toNum(bankDuesSum._sum.amountDue) - toNum(bankExpSum._sum.amount);
+  const payboxBalance = toNum(building.openingBalancePaybox) + toNum(payboxDuesSum._sum.amountDue) - toNum(payboxExpSum._sum.amount);
+  const cashBalance = toNum(building.openingBalanceCash) + toNum(cashDuesSum._sum.amountDue) - toNum(cashExpSum._sum.amount);
 
   return {
-    digitalBalance: round2(digitalBalance),
+    bankBalance: round2(bankBalance),
+    payboxBalance: round2(payboxBalance),
     cashBalance: round2(cashBalance),
-    totalBalance: round2(digitalBalance + cashBalance),
+    totalBalance: round2(bankBalance + payboxBalance + cashBalance),
   };
 }
 

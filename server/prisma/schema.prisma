@@ -41,7 +41,8 @@ model Building {
   apartmentsCount       Int      @default(0)
   monthlyFeeDefault     Decimal  @default(0) @db.Decimal(10, 2)
   openingBalanceCash    Decimal  @default(0) @db.Decimal(10, 2)
-  openingBalanceDigital Decimal  @default(0) @db.Decimal(10, 2)
+  openingBalanceBank    Decimal  @default(0) @db.Decimal(10, 2)
+  openingBalancePaybox  Decimal  @default(0) @db.Decimal(10, 2)
   openingBalanceDate    DateTime @default(now())
   elevatorsCount        Int      @default(0)
   electricityBenchmark  Decimal  @default(0) @db.Decimal(10, 2)
@@ -135,7 +136,7 @@ model ComplexExpense {
   category    String
   description String?
   amount      Decimal  @db.Decimal(10, 2)
-  paidFrom    String // CASH | DIGITAL
+  paidFrom    String // CASH | BANK | PAYBOX
   createdAt   DateTime @default(now())
 
   buildingExpenses Expense[]
@@ -163,7 +164,7 @@ model Due {
   year             Int
   month            Int // 1-12
   amountDue        Decimal   @db.Decimal(10, 2)
-  status           String    @default("UNPAID") // UNPAID | PAID_BANK | PAID_CASH | PENDING_CASH_APPROVAL
+  status           String    @default("UNPAID") // UNPAID | PAID_BANK | PAID_PAYBOX | PAID_CASH | PENDING_CASH_APPROVAL
   paidDate         DateTime?
   reportedByTenant Boolean   @default(false)
   approvedAt       DateTime?
@@ -199,7 +200,7 @@ model Expense {
   description      String?
   supplierName     String?
   amount           Decimal         @db.Decimal(10, 2)
-  paidFrom         String // CASH | DIGITAL
+  paidFrom         String // CASH | BANK | PAYBOX
   receiptUrl       String? // external link, kept as an alternative to an uploaded file
   receiptFileName  String?
   receiptMimeType  String?

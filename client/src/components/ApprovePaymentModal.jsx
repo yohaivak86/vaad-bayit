@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, CheckCircle2, Landmark, PartyPopper } from 'lucide-react';
+import { X, CheckCircle2, Landmark, Smartphone, PartyPopper } from 'lucide-react';
 import { api } from '../api';
 import { formatILS, MONTHS_HE } from '../format';
 
@@ -16,7 +16,7 @@ export default function ApprovePaymentModal({ buildingId, onClose, onApproved })
     const outstanding = [];
     for (const tenant of data.tenants) {
       const due = tenant.dues.find((d) => d.month === currentMonth);
-      if (due && due.status !== 'PAID_BANK' && due.status !== 'PAID_CASH') {
+      if (due && due.status !== 'PAID_BANK' && due.status !== 'PAID_PAYBOX' && due.status !== 'PAID_CASH') {
         outstanding.push({ ...due, tenantName: tenant.name, apartmentNumber: tenant.apartmentNumber });
       }
     }
@@ -67,13 +67,19 @@ export default function ApprovePaymentModal({ buildingId, onClose, onApproved })
                   onClick={() => act(api.approveCash, d.id)}
                   className="flex-1 flex items-center justify-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-lg px-2 py-1.5 transition"
                 >
-                  <CheckCircle2 size={13} /> שולם במזומן
+                  <CheckCircle2 size={13} /> מזומן
                 </button>
                 <button
                   onClick={() => act(api.markBank, d.id)}
                   className="flex-1 flex items-center justify-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg px-2 py-1.5 transition"
                 >
-                  <Landmark size={13} /> שולם בבנק
+                  <Landmark size={13} /> בנק
+                </button>
+                <button
+                  onClick={() => act(api.markPaybox, d.id)}
+                  className="flex-1 flex items-center justify-center gap-1 bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-semibold rounded-lg px-2 py-1.5 transition"
+                >
+                  <Smartphone size={13} /> PayBox
                 </button>
               </div>
             </div>
