@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2, Printer, Filter } from 'lucide-react';
+import { Trash2, Printer, Filter, Paperclip, X, Upload } from 'lucide-react';
 import { api } from '../../api';
 import { EXPENSE_CATEGORIES } from '../../constants';
 import { formatILS, formatDateHe } from '../../format';
@@ -16,6 +16,7 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
   const [filters, setFilters] = useState({ from: firstOfMonth(), to: today(), category: '', paidFrom: '' });
   const [expenses, setExpenses] = useState(null);
   const [summary, setSummary] = useState(null);
+  const [receiptExpense, setReceiptExpense] = useState(null);
 
   const load = async () => {
     const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
@@ -111,29 +112,122 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
               <th className="px-3 py-2 text-start font-semibold hidden sm:table-cell">ספק</th>
               <th className="px-3 py-2 text-start font-semibold">מקור</th>
               <th className="px-3 py-2 text-start font-semibold">סכום</th>
+              <th className="px-3 py-2 no-print"></th>
               {!readOnly && <th className="px-3 py-2 no-print"></th>}
             </tr>
           </thead>
           <tbody>
-            {expenses?.map((e) => (
-              <tr key={e.id} className="border-t border-slate-100">
-                <td className="px-3 py-2 whitespace-nowrap">{formatDateHe(e.date)}</td>
-                <td className="px-3 py-2">{e.category}</td>
-                <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{e.supplierName || '—'}</td>
-                <td className="px-3 py-2">{e.paidFrom === 'CASH' ? 'מזומן' : 'בנק'}</td>
-                <td className="px-3 py-2 font-medium">{formatILS(e.amount)}</td>
-                {!readOnly && (
+            {expenses?.map((e) => {
+              const hasReceipt = e.receiptFileName || e.receiptUrl;
+              return (
+                <tr key={e.id} className="border-t border-slate-100">
+                  <td className="px-3 py-2 whitespace-nowrap">{formatDateHe(e.date)}</td>
+                  <td className="px-3 py-2">{e.category}</td>
+                  <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{e.supplierName || '—'}</td>
+                  <td className="px-3 py-2">{e.paidFrom === 'CASH' ? 'מזומן' : 'בנק'}</td>
+                  <td className="px-3 py-2 font-medium">{formatILS(e.amount)}</td>
                   <td className="px-3 py-2 no-print">
-                    <button onClick={() => remove(e.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+                    <button
+                      onClick={() => setReceiptExpense(e)}
+                      className={`flex items-center gap-1 text-xs ${hasReceipt ? 'text-blue-600' : 'text-slate-300'} hover:text-blue-700`}
+                      title={hasReceipt ? 'צפייה בקבלה' : readOnly ? 'אין קבלה' : 'צירוף קבלה'}
+                    >
+                      <Paperclip size={14} />
+                    </button>
                   </td>
-                )}
-              </tr>
-            ))}
+                  {!readOnly && (
+                    <td className="px-3 py-2 no-print">
+                      <button onClick={() => remove(e.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
             {expenses?.length === 0 && (
-              <tr><td colSpan={6} className="text-center text-slate-400 py-8 text-sm">אין הוצאות בטווח שנבחר</td></tr>
+              <tr><td colSpan={7} className="text-center text-slate-400 py-8 text-sm">אין הוצאות בטווח שנבחר</td></tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {receiptExpense && (
+        <ReceiptModal
+          buildingId={buildingId}
+          expense={receiptExpense}
+          readOnly={readOnly}
+          onClose={() => setReceiptExpense(null)}
+          onChanged={load}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReceiptModal({ buildingId, expense, readOnly, onClose, onChanged }) {
+  const [uploading, setUploading] = useState(false);
+  const hasFile = Boolean(expense.receiptFileName);
+  const receiptUrl = hasFile ? api.getReceiptUrl(buildingId, expense.id) : expense.receiptUrl;
+  const isImage = expense.receiptMimeType?.startsWith('image/');
+
+  const upload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      await api.uploadReceipt(buildingId, expense.id, file);
+      await onChanged();
+      onClose();
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const remove = async () => {
+    await api.deleteReceipt(buildingId, expense.id);
+    await onChanged();
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <h2 className="font-bold text-lg text-slate-800">קבלה - {expense.category}</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          {receiptUrl ? (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              {hasFile && isImage ? (
+                <img src={receiptUrl} alt="קבלה" className="w-full max-h-64 object-contain bg-slate-50" />
+              ) : (
+                <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-3 text-sm text-blue-600 hover:bg-slate-50">
+                  <Paperclip size={16} /> פתיחת הקבלה
+                </a>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 text-center py-4">אין קבלה מצורפת</p>
+          )}
+
+          {!readOnly && (
+            <>
+              <label className="flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-500 cursor-pointer hover:bg-slate-50">
+                <Upload size={16} />
+                {uploading ? 'מעלה...' : receiptUrl ? 'החלפת הקבלה' : 'העלאת קבלה'}
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => upload(e.target.files?.[0])}
+                />
+              </label>
+              {hasFile && (
+                <button onClick={remove} className="w-full text-xs text-red-600 hover:underline">הסרת הקבלה</button>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

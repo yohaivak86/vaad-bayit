@@ -200,7 +200,10 @@ model Expense {
   supplierName     String?
   amount           Decimal         @db.Decimal(10, 2)
   paidFrom         String // CASH | DIGITAL
-  receiptUrl       String?
+  receiptUrl       String? // external link, kept as an alternative to an uploaded file
+  receiptFileName  String?
+  receiptMimeType  String?
+  receiptData      Bytes?
   createdAt        DateTime        @default(now())
   complexExpenseId Int? // set when this row was auto-generated from a shared ComplexExpense
   complexExpense   ComplexExpense? @relation(fields: [complexExpenseId], references: [id], onDelete: Cascade)

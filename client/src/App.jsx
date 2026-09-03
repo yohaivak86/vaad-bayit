@@ -64,6 +64,11 @@ export default function App() {
     }
   }, [buildingId, loadBuilding, refreshBalance]);
 
+  // The tenants/dues tab is admin-only (hides per-apartment debt info from viewers).
+  useEffect(() => {
+    if (readOnly && tab === 'tenants') setTab('expenses');
+  }, [readOnly, tab]);
+
   const saveSettings = async (form) => {
     const updated = await api.updateBuilding(buildingId, form);
     setBuilding(updated);
@@ -71,8 +76,9 @@ export default function App() {
     await refreshBalance();
   };
 
-  const saveExpense = async (form) => {
-    await api.createExpense(buildingId, form);
+  const saveExpense = async (form, receiptFile) => {
+    const created = await api.createExpense(buildingId, form);
+    if (receiptFile) await api.uploadReceipt(buildingId, created.id, receiptFile);
     setShowAddExpense(false);
     await refreshBalance();
   };
@@ -124,9 +130,9 @@ export default function App() {
         readOnly={readOnly}
       />
       <AnnouncementsBoard buildingId={buildingId} readOnly={readOnly} />
-      <TabBar active={tab} onChange={setTab} />
+      <TabBar active={tab} onChange={setTab} readOnly={readOnly} />
 
-      {tab === 'tenants' && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={readOnly} />}
+      {tab === 'tenants' && !readOnly && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={readOnly} />}
       {tab === 'tasks' && <TasksTab buildingId={buildingId} readOnly={readOnly} />}
       {tab === 'expenses' && <ExpensesTab buildingId={buildingId} building={building} readOnly={readOnly} />}
       {tab === 'budget' && <BudgetTab buildingId={buildingId} readOnly={readOnly} />}

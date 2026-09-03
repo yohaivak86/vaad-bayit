@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const { requireAuth, requireBuildingAccess, blockViewerWrites } = require('./middleware/auth');
+const { requireAuth, requireBuildingAccess, blockViewerWrites, requireAdminRole } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const buildingsListRoutes = require('./routes/buildings');
 const buildingRoutes = require('./routes/building');
@@ -33,8 +33,9 @@ app.use('/api/complexes', complexesRoutes);
 // the caller to be authenticated and to have access to that specific building.
 const buildingScope = express.Router({ mergeParams: true });
 buildingScope.use('/', buildingRoutes);
-buildingScope.use('/tenants', tenantsRoutes);
-buildingScope.use('/dues', duesRoutes);
+// Per-apartment payment status/debts is sensitive - fully hidden from VIEWERs, not just read-only.
+buildingScope.use('/tenants', requireAdminRole, tenantsRoutes);
+buildingScope.use('/dues', requireAdminRole, duesRoutes);
 buildingScope.use('/tasks', tasksRoutes);
 buildingScope.use('/expenses', expensesRoutes);
 buildingScope.use('/budget', budgetRoutes);

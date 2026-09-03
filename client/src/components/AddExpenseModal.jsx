@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Paperclip } from 'lucide-react';
 import { EXPENSE_CATEGORIES } from '../constants';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -14,6 +14,7 @@ export default function AddExpenseModal({ onClose, onSave }) {
     paidFrom: 'DIGITAL',
     receiptUrl: '',
   });
+  const [receiptFile, setReceiptFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -22,7 +23,7 @@ export default function AddExpenseModal({ onClose, onSave }) {
     if (!form.amount || Number(form.amount) <= 0) return;
     setSaving(true);
     try {
-      await onSave({ ...form, amount: Number(form.amount) });
+      await onSave({ ...form, amount: Number(form.amount) }, receiptFile);
     } finally {
       setSaving(false);
     }
@@ -76,7 +77,19 @@ export default function AddExpenseModal({ onClose, onSave }) {
               ))}
             </div>
           </Field>
-          <Field label="קישור לקבלה (אופציונלי)">
+          <Field label="קבלה (אופציונלי)">
+            <label className="flex items-center gap-2 border border-dashed border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-500 cursor-pointer hover:bg-slate-50">
+              <Paperclip size={16} />
+              {receiptFile ? receiptFile.name : 'העלאת תמונה או PDF של הקבלה'}
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+              />
+            </label>
+          </Field>
+          <Field label="או קישור לקבלה (אופציונלי)">
             <input value={form.receiptUrl} onChange={(e) => set('receiptUrl', e.target.value)} className="input" placeholder="https://..." />
           </Field>
 

@@ -46,4 +46,13 @@ function blockViewerWrites(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, requireBuildingAccess, blockViewerWrites };
+// Some data (per-apartment payment status/debts) is sensitive enough that even a VIEWER
+// shouldn't read it, not just be blocked from editing it - full ADMIN only, no GET exception.
+function requireAdminRole(req, res, next) {
+  if (req.buildingRole !== 'ADMIN') {
+    return res.status(403).json({ error: 'מסך זה זמין לאדמיני הבניין בלבד' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireBuildingAccess, blockViewerWrites, requireAdminRole };

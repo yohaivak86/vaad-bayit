@@ -14,6 +14,19 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// Separate from request(): a file upload must NOT set a JSON Content-Type header -
+// the browser needs to set multipart/form-data with its own boundary.
+async function uploadFile(path, file, fieldName) {
+  const form = new FormData();
+  form.append(fieldName, file);
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', credentials: 'include', body: form });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `שגיאת שרת (${res.status})`);
+  }
+  return res.json();
+}
+
 export const api = {
   // Auth
   me: () => request('/auth/me'),
@@ -74,6 +87,9 @@ export const api = {
   createExpense: (buildingId, data) => request(`/buildings/${buildingId}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
   updateExpense: (buildingId, id, data) => request(`/buildings/${buildingId}/expenses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteExpense: (buildingId, id) => request(`/buildings/${buildingId}/expenses/${id}`, { method: 'DELETE' }),
+  uploadReceipt: (buildingId, id, file) => uploadFile(`/buildings/${buildingId}/expenses/${id}/receipt`, file, 'receipt'),
+  getReceiptUrl: (buildingId, id) => `${BASE}/buildings/${buildingId}/expenses/${id}/receipt`,
+  deleteReceipt: (buildingId, id) => request(`/buildings/${buildingId}/expenses/${id}/receipt`, { method: 'DELETE' }),
 
   // Budget
   getBudgetItems: (buildingId) => request(`/buildings/${buildingId}/budget`),

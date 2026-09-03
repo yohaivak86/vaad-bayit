@@ -1,14 +1,15 @@
 import { Users, ClipboardList, Receipt, LineChart, FileText } from 'lucide-react';
 
-const TABS = [
-  { key: 'tenants', label: 'דיירים וגבייה', icon: Users },
+const ALL_TABS = [
+  { key: 'tenants', label: 'דיירים וגבייה', icon: Users, adminOnly: true },
   { key: 'tasks', label: 'משימות ותקלות', icon: ClipboardList },
   { key: 'expenses', label: 'הוצאות ותנועות', icon: Receipt },
   { key: 'budget', label: 'תכנון שנתי', icon: LineChart },
   { key: 'documents', label: 'מסמכים ונהלים', icon: FileText },
 ];
 
-export default function TabBar({ active, onChange }) {
+export default function TabBar({ active, onChange, readOnly }) {
+  const TABS = ALL_TABS.filter((t) => !readOnly || !t.adminOnly);
   return (
     <div className="no-print">
       <div className="hidden sm:flex max-w-6xl mx-auto px-4 gap-1 border-b border-slate-200 bg-white sticky top-[164px] z-20">
