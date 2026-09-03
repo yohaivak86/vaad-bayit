@@ -9,6 +9,7 @@ import ProfessionalsDirectoryModal from './components/ProfessionalsDirectoryModa
 import AuthScreen from './components/AuthScreen';
 import BuildingSelector from './components/BuildingSelector';
 import AnnouncementsBoard from './components/AnnouncementsBoard';
+import SuggestionButton from './components/SuggestionButton';
 import TenantsTab from './components/tabs/TenantsTab';
 import TasksTab from './components/tabs/TasksTab';
 import ExpensesTab from './components/tabs/ExpensesTab';
@@ -107,13 +108,16 @@ export default function App() {
       return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">טוען...</div>;
     }
     return (
-      <BuildingSelector
-        user={user}
-        buildings={buildings}
-        onSelect={setBuildingId}
-        onLogout={logout}
-        onBuildingsChanged={loadBuildings}
-      />
+      <>
+        <BuildingSelector
+          user={user}
+          buildings={buildings}
+          onSelect={setBuildingId}
+          onLogout={logout}
+          onBuildingsChanged={loadBuildings}
+        />
+        <SuggestionButton />
+      </>
     );
   }
 
@@ -156,6 +160,7 @@ export default function App() {
       {showProfessionals && (
         <ProfessionalsDirectoryModal onClose={() => setShowProfessionals(false)} />
       )}
+      <SuggestionButton buildingId={buildingId} />
     </div>
   );
 }

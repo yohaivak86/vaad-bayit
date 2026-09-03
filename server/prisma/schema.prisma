@@ -18,6 +18,7 @@ model User {
   createdAt      DateTime        @default(now())
   buildingAdmins BuildingAdmin[]
   ownedComplexes Complex[]
+  suggestions    Suggestion[]
 }
 
 // A tradesperson/contractor who registered interest in offering services through the
@@ -38,6 +39,21 @@ model Professional {
 model AppSettings {
   id                    Int     @id @default(1)
   showBuildingCountStat Boolean @default(true)
+}
+
+// A free-text improvement suggestion, submittable from anywhere in the app. Reviewed
+// only by the super-admin, who tracks its status and can leave a private note.
+model Suggestion {
+  id         Int       @id @default(autoincrement())
+  userId     Int?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  buildingId Int?
+  building   Building? @relation(fields: [buildingId], references: [id], onDelete: SetNull)
+  text       String
+  status     String    @default("NEW") // NEW | IN_PROGRESS | DONE | REJECTED
+  adminNotes String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 // Join table: which buildings a BUILDING_ADMIN user manages, and with what access.
@@ -84,6 +100,8 @@ model Building {
   meetingMinutes  MeetingMinutes[]
   procedures      Procedure[]
   announcements   Announcement[]
+  suggestions     Suggestion[]
+  electricityDebts ComplexElectricityDebt[]
 }
 
 model MeetingMinutes {
@@ -121,15 +139,18 @@ model Announcement {
 // shared parking, etc). Only its owner manages membership, splits and expenses;
 // member-building admins can view what's charged to their own building.
 model Complex {
-  id          Int      @id @default(autoincrement())
-  name        String
-  ownerId     Int
-  owner       User     @relation(fields: [ownerId], references: [id])
-  inviteCode  String   @unique
-  createdAt   DateTime @default(now())
+  id                     Int      @id @default(autoincrement())
+  name                   String
+  ownerId                Int
+  owner                  User     @relation(fields: [ownerId], references: [id])
+  inviteCode             String   @unique
+  electricityRatePerUnit Decimal? @db.Decimal(10, 4) // ₪ per meter unit, set once by the owner
+  lastElectricityReading Decimal? @db.Decimal(12, 2) // baseline for the next reading's consumption
+  createdAt              DateTime @default(now())
 
-  members  ComplexMember[]
-  expenses ComplexExpense[]
+  members             ComplexMember[]
+  expenses             ComplexExpense[]
+  electricityReadings  ComplexElectricityReading[]
 }
 
 // A building's membership in a complex, with an optional custom cost-share.
@@ -162,6 +183,36 @@ model ComplexExpense {
   createdAt   DateTime @default(now())
 
   buildingExpenses Expense[]
+}
+
+// A shared electricity meter reading for the complex. Consumption since the previous
+// reading is costed at the complex's per-unit rate and split into a per-building debt -
+// a standalone ledger deliberately kept separate from each building's own treasury
+// (no Expense rows created) until that specific building's debt is marked paid.
+model ComplexElectricityReading {
+  id              Int      @id @default(autoincrement())
+  complexId       Int
+  complex         Complex  @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  readingDate     DateTime
+  previousReading Decimal  @db.Decimal(12, 2)
+  currentReading  Decimal  @db.Decimal(12, 2)
+  consumption     Decimal  @db.Decimal(12, 2)
+  ratePerUnit     Decimal  @db.Decimal(10, 4)
+  totalCost       Decimal  @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+
+  debts ComplexElectricityDebt[]
+}
+
+model ComplexElectricityDebt {
+  id         Int                        @id @default(autoincrement())
+  readingId  Int
+  reading    ComplexElectricityReading  @relation(fields: [readingId], references: [id], onDelete: Cascade)
+  buildingId Int
+  building   Building                   @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  amountOwed Decimal                    @db.Decimal(10, 2)
+  paid       Boolean                    @default(false)
+  paidAt     DateTime?
 }
 
 model Tenant {

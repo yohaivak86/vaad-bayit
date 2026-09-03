@@ -3,6 +3,7 @@ const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { generateInviteCode } = require('../lib/inviteCode');
 const { computeSplits } = require('../lib/complexSplit');
+const { round2 } = require('../lib/calc');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -15,6 +16,8 @@ function publicComplex(complex, { includeInviteCode }) {
     ownerName: complex.owner?.name,
     createdAt: complex.createdAt,
     inviteCode: includeInviteCode ? complex.inviteCode : undefined,
+    electricityRatePerUnit: complex.electricityRatePerUnit !== null && complex.electricityRatePerUnit !== undefined ? Number(complex.electricityRatePerUnit) : null,
+    lastElectricityReading: complex.lastElectricityReading !== null && complex.lastElectricityReading !== undefined ? Number(complex.lastElectricityReading) : null,
     members: complex.members?.map((m) => ({
       buildingId: m.buildingId,
       buildingName: m.building?.name,
@@ -239,6 +242,131 @@ router.delete('/:id/expenses/:expenseId', async (req, res) => {
 
   await prisma.complexExpense.delete({ where: { id: Number(req.params.expenseId) } }).catch(() => null);
   res.status(204).end();
+});
+
+// Owner sets the ₪-per-unit rate used to cost future meter readings.
+router.put('/:id/electricity-rate', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לקבוע את התעריף' });
+
+  const { rate } = req.body;
+  if (rate === undefined || rate === null || Number(rate) <= 0) {
+    return res.status(400).json({ error: 'rate חייב להיות מספר חיובי' });
+  }
+  const updated = await prisma.complex.update({ where: { id: complex.id }, data: { electricityRatePerUnit: Number(rate) } });
+  res.json({ electricityRatePerUnit: Number(updated.electricityRatePerUnit) });
+});
+
+router.get('/:id/electricity-readings', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+
+  const buildingIds = await myBuildingIds(req.user);
+  const isMember = complex.members.some((m) => buildingIds.includes(m.buildingId));
+  if (!isOwner(complex, req.user) && !isMember) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
+
+  const readings = await prisma.complexElectricityReading.findMany({
+    where: { complexId: complex.id },
+    include: { debts: { include: { building: { select: { name: true } } } } },
+    orderBy: { readingDate: 'desc' },
+  });
+  res.json(
+    readings.map((r) => ({
+      id: r.id,
+      readingDate: r.readingDate,
+      previousReading: Number(r.previousReading),
+      currentReading: Number(r.currentReading),
+      consumption: Number(r.consumption),
+      ratePerUnit: Number(r.ratePerUnit),
+      totalCost: Number(r.totalCost),
+      debts: r.debts.map((d) => ({
+        id: d.id,
+        buildingId: d.buildingId,
+        buildingName: d.building.name,
+        amountOwed: Number(d.amountOwed),
+        paid: d.paid,
+        paidAt: d.paidAt,
+      })),
+    }))
+  );
+});
+
+// Records a new meter reading. Consumption is measured from the complex's last reading
+// (or this becomes the baseline if there isn't one yet) and split into a per-building
+// debt - a standalone ledger, not posted to any building's own Expense records.
+router.post('/:id/electricity-readings', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול להזין קריאת מונה' });
+
+  const { currentReading, date } = req.body;
+  if (currentReading === undefined || currentReading === null) {
+    return res.status(400).json({ error: 'currentReading הוא שדה חובה' });
+  }
+  if (!complex.electricityRatePerUnit) {
+    return res.status(400).json({ error: 'יש לקבוע תעריף לפני הזנת קריאת מונה' });
+  }
+  const current = Number(currentReading);
+
+  if (complex.lastElectricityReading === null || complex.lastElectricityReading === undefined) {
+    const updated = await prisma.complex.update({ where: { id: complex.id }, data: { lastElectricityReading: current } });
+    return res.status(201).json({ baseline: true, lastElectricityReading: Number(updated.lastElectricityReading) });
+  }
+
+  const previous = Number(complex.lastElectricityReading);
+  if (current < previous) return res.status(400).json({ error: 'הקריאה החדשה נמוכה מהקריאה הקודמת' });
+
+  const consumption = current - previous;
+  const rate = Number(complex.electricityRatePerUnit);
+  const totalCost = round2(consumption * rate);
+
+  if (complex.members.length === 0) return res.status(400).json({ error: 'אין בניינים חברים במתחם' });
+  const members = complex.members
+    .slice()
+    .sort((a, b) => a.buildingId - b.buildingId)
+    .map((m) => ({ buildingId: m.buildingId, sharePercent: m.sharePercent !== null && m.sharePercent !== undefined ? Number(m.sharePercent) : null }));
+  const splits = computeSplits(totalCost, members);
+
+  const reading = await prisma.$transaction(async (tx) => {
+    const created = await tx.complexElectricityReading.create({
+      data: {
+        complexId: complex.id,
+        readingDate: date ? new Date(date) : new Date(),
+        previousReading: previous,
+        currentReading: current,
+        consumption,
+        ratePerUnit: rate,
+        totalCost,
+      },
+    });
+    for (const s of splits) {
+      await tx.complexElectricityDebt.create({
+        data: { readingId: created.id, buildingId: s.buildingId, amountOwed: s.amount },
+      });
+    }
+    await tx.complex.update({ where: { id: complex.id }, data: { lastElectricityReading: current } });
+    return created;
+  });
+
+  res.status(201).json({ id: reading.id, consumption, totalCost, splits });
+});
+
+router.post('/:id/electricity-debts/:debtId/mark-paid', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לסמן חוב כשולם' });
+
+  const debt = await prisma.complexElectricityDebt.findFirst({
+    where: { id: Number(req.params.debtId), reading: { complexId: complex.id } },
+  });
+  if (!debt) return res.status(404).json({ error: 'חוב לא נמצא' });
+
+  const updated = await prisma.complexElectricityDebt.update({
+    where: { id: debt.id },
+    data: { paid: true, paidAt: new Date() },
+  });
+  res.json({ id: updated.id, paid: updated.paid, paidAt: updated.paidAt });
 });
 
 module.exports = router;

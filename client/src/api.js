@@ -39,6 +39,18 @@ export const api = {
   getAppSettings: () => request('/settings'),
   updateAppSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Global admin control center (super-admin only)
+  getAllBuildings: () => request('/admin/buildings'),
+  deleteAnyBuilding: (id) => request(`/admin/buildings/${id}`, { method: 'DELETE' }),
+  getAllUsers: () => request('/admin/users'),
+  updateUserRole: (id, role) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: 'DELETE' }),
+
+  // Improvement suggestions
+  createSuggestion: (data) => request('/suggestions', { method: 'POST', body: JSON.stringify(data) }),
+  getSuggestions: () => request('/suggestions'),
+  updateSuggestion: (id, data) => request(`/suggestions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   // Auth
   me: () => request('/auth/me'),
   login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
@@ -72,6 +84,10 @@ export const api = {
   getComplexExpenses: (id) => request(`/complexes/${id}/expenses`),
   createComplexExpense: (id, data) => request(`/complexes/${id}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
   deleteComplexExpense: (id, expenseId) => request(`/complexes/${id}/expenses/${expenseId}`, { method: 'DELETE' }),
+  setComplexElectricityRate: (id, rate) => request(`/complexes/${id}/electricity-rate`, { method: 'PUT', body: JSON.stringify({ rate }) }),
+  getComplexElectricityReadings: (id) => request(`/complexes/${id}/electricity-readings`),
+  addComplexElectricityReading: (id, data) => request(`/complexes/${id}/electricity-readings`, { method: 'POST', body: JSON.stringify(data) }),
+  markElectricityDebtPaid: (id, debtId) => request(`/complexes/${id}/electricity-debts/${debtId}/mark-paid`, { method: 'POST' }),
 
   // Tenants
   getTenants: (buildingId) => request(`/buildings/${buildingId}/tenants`),

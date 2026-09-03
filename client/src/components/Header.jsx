@@ -1,4 +1,5 @@
-import { Building2, Wallet, Landmark, Smartphone, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye, Wrench } from 'lucide-react';
+import { useState } from 'react';
+import { Building2, Wallet, Landmark, Smartphone, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye, Wrench, Copy, Check } from 'lucide-react';
 import { formatILS } from '../format';
 
 export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onOpenProfessionals, onSwitchBuilding, showSwitch, onLogout, readOnly }) {
@@ -19,7 +20,10 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
                   </span>
                 )}
               </h1>
-              <p className="text-xs text-slate-500 truncate">{building?.address}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-xs text-slate-500 truncate">{building?.address}</p>
+                {!readOnly && building?.inviteCode && <InviteCodeChip code={building.inviteCode} />}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -103,6 +107,32 @@ const COLOR_MAP = {
   amber: 'bg-amber-50 text-amber-700 border-amber-100',
   emerald: 'bg-emerald-50 text-emerald-700 border-emerald-100',
 };
+
+function InviteCodeChip({ code }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async (e) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable - ignore */
+    }
+  };
+
+  return (
+    <button
+      onClick={copy}
+      className="flex items-center gap-1 text-[10px] font-mono bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 shrink-0 hover:bg-blue-100 transition"
+      title="קוד הזמנה לבניין - לחצו להעתקה"
+    >
+      {copied ? <Check size={10} /> : <Copy size={10} />}
+      {code}
+    </button>
+  );
+}
 
 function SummaryCard({ icon: Icon, label, value, color, bold }) {
   return (

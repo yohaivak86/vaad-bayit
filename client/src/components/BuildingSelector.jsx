@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock, Settings2 } from 'lucide-react';
+import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock, Settings2, Lightbulb, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
 import ComplexesModal from './ComplexesModal';
 import SiteSettingsModal from './SiteSettingsModal';
+import SuggestionsAdminModal from './SuggestionsAdminModal';
+import AdminControlCenterModal from './AdminControlCenterModal';
 
 export default function BuildingSelector({ user, buildings, onSelect, onLogout, onBuildingsChanged }) {
   const [showCreate, setShowCreate] = useState(false);
   const [showComplexes, setShowComplexes] = useState(false);
   const [showSiteSettings, setShowSiteSettings] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showControlCenter, setShowControlCenter] = useState(false);
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 px-4 py-8">
@@ -65,10 +69,22 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
               <Plus size={16} /> הוספת בניין חדש
             </button>
             <button
+              onClick={() => setShowControlCenter(true)}
+              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
+            >
+              <ShieldCheck size={16} /> מרכז ניהול (כל הבניינים והמשתמשים)
+            </button>
+            <button
               onClick={() => setShowSiteSettings(true)}
               className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
             >
               <Settings2 size={16} /> הגדרות מערכת
+            </button>
+            <button
+              onClick={() => setShowSuggestions(true)}
+              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
+            >
+              <Lightbulb size={16} /> הצעות לשיפור
             </button>
           </>
         )}
@@ -94,6 +110,12 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
       )}
       {showSiteSettings && (
         <SiteSettingsModal onClose={() => setShowSiteSettings(false)} />
+      )}
+      {showSuggestions && (
+        <SuggestionsAdminModal onClose={() => setShowSuggestions(false)} />
+      )}
+      {showControlCenter && (
+        <AdminControlCenterModal currentUserId={user.id} onClose={() => setShowControlCenter(false)} />
       )}
     </div>
   );

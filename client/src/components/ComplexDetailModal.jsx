@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Copy, RefreshCw, Check, Trash2, Plus, Scale } from 'lucide-react';
+import { X, Copy, RefreshCw, Check, Trash2, Plus, Scale, Zap, CheckCircle2 } from 'lucide-react';
 import { api } from '../api';
 import { formatILS, formatDateHe } from '../format';
 import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../constants';
@@ -7,18 +7,23 @@ import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../constants';
 export default function ComplexDetailModal({ complexId, onClose, onChanged }) {
   const [complex, setComplex] = useState(null);
   const [expenses, setExpenses] = useState(null);
+  const [readings, setReadings] = useState(null);
   const [shares, setShares] = useState({});
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showReadingForm, setShowReadingForm] = useState(false);
+  const [rateInput, setRateInput] = useState('');
 
   const load = async () => {
     const c = await api.getComplex(complexId);
     setComplex(c);
+    setRateInput(c.electricityRatePerUnit ?? '');
     const initialShares = {};
     c.members.forEach((m) => { initialShares[m.buildingId] = m.sharePercent ?? ''; });
     setShares(initialShares);
     setExpenses(await api.getComplexExpenses(complexId));
+    setReadings(await api.getComplexElectricityReadings(complexId));
   };
 
   useEffect(() => { load(); }, [complexId]);
@@ -65,6 +70,17 @@ export default function ComplexDetailModal({ complexId, onClose, onChanged }) {
     await api.deleteComplexExpense(complexId, id);
     await load();
     onChanged?.();
+  };
+
+  const saveRate = async () => {
+    if (!rateInput || Number(rateInput) <= 0) return;
+    await api.setComplexElectricityRate(complexId, Number(rateInput));
+    await load();
+  };
+
+  const markDebtPaid = async (debtId) => {
+    await api.markElectricityDebtPaid(complexId, debtId);
+    await load();
   };
 
   if (!complex) {
@@ -149,6 +165,72 @@ export default function ComplexDetailModal({ complexId, onClose, onChanged }) {
           </div>
 
           <div>
+            <p className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-1.5"><Zap size={13} /> מונה חשמל משותף</p>
+            {isOwner ? (
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="number"
+                  step="0.0001"
+                  min="0"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder="תעריף ל-יחידה (₪)"
+                  className="input text-sm"
+                />
+                <button onClick={saveRate} className="shrink-0 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg px-3 py-2 transition">
+                  שמירת תעריף
+                </button>
+              </div>
+            ) : (
+              complex.electricityRatePerUnit && (
+                <p className="text-xs text-slate-500 mb-2">תעריף: {formatILS(complex.electricityRatePerUnit)} ליחידה</p>
+              )
+            )}
+
+            {complex.lastElectricityReading !== null && (
+              <p className="text-[11px] text-slate-400 mb-2">קריאה אחרונה: {complex.lastElectricityReading}</p>
+            )}
+
+            {isOwner && (
+              <button
+                onClick={() => setShowReadingForm(true)}
+                disabled={!complex.electricityRatePerUnit}
+                className="flex items-center gap-1 text-xs text-blue-600 font-semibold disabled:text-slate-300 mb-2"
+              >
+                <Plus size={13} /> קריאת מונה חדשה
+              </button>
+            )}
+
+            <div className="space-y-1.5">
+              {readings?.map((r) => (
+                <div key={r.id} className="border border-slate-200 rounded-lg px-3 py-2">
+                  <p className="text-sm font-medium text-slate-800">
+                    {formatDateHe(r.readingDate)} · צריכה {r.consumption} יח' · {formatILS(r.totalCost)}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {r.debts.map((d) => (
+                      <span
+                        key={d.id}
+                        className={`flex items-center gap-1 text-[10px] rounded px-1.5 py-0.5 border ${
+                          d.paid ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {d.buildingName}: {formatILS(d.amountOwed)} {d.paid ? '· שולם' : '· ממתין'}
+                        {isOwner && !d.paid && (
+                          <button onClick={() => markDebtPaid(d.id)} title="סימון כשולם" className="hover:text-emerald-800">
+                            <CheckCircle2 size={11} />
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {readings?.length === 0 && <p className="text-xs text-slate-400 text-center py-3">אין עדיין קריאות מונה</p>}
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-slate-500">הוצאות משותפות</p>
               {isOwner && (
@@ -192,6 +274,17 @@ export default function ComplexDetailModal({ complexId, onClose, onChanged }) {
             setShowExpenseForm(false);
             await load();
             onChanged?.();
+          }}
+        />
+      )}
+      {showReadingForm && (
+        <ElectricityReadingFormModal
+          lastReading={complex.lastElectricityReading}
+          onClose={() => setShowReadingForm(false)}
+          onSave={async (form) => {
+            await api.addComplexElectricityReading(complexId, form);
+            setShowReadingForm(false);
+            await load();
           }}
         />
       )}
@@ -265,6 +358,58 @@ function ComplexExpenseFormModal({ onClose, onSave }) {
           </div>
           <p className="text-[11px] text-slate-400">הסכום יתחלק אוטומטית בין הבניינים החברים לפי החלוקה שהוגדרה, וינוכה מיתרת כל בניין.</p>
           <div className="pt-2 flex gap-2">
+            <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
+              {saving ? 'שומר...' : 'שמירה'}
+            </button>
+            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">ביטול</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ElectricityReadingFormModal({ lastReading, onClose, onSave }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [currentReading, setCurrentReading] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (currentReading === '') return;
+    setSaving(true);
+    try {
+      await onSave({ date, currentReading: Number(currentReading) });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+          <h2 className="font-bold text-lg text-slate-800">קריאת מונה חדשה</h2>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
+        </div>
+        <form onSubmit={submit} className="px-5 py-4 space-y-3">
+          {lastReading === null ? (
+            <p className="text-xs text-slate-500">
+              זו הקריאה הראשונה - היא תישמר כנקודת ייחוס, ועדיין לא ייווצר חוב. החוב הראשון ייווצר מהקריאה הבאה.
+            </p>
+          ) : (
+            <p className="text-xs text-slate-500">קריאה קודמת: {lastReading}</p>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">תאריך</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="input" required />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">קריאת מונה נוכחית</label>
+            <input type="number" step="0.01" min="0" value={currentReading} onChange={(e) => setCurrentReading(e.target.value)} className="input" required />
+          </div>
+          <div className="pt-1 flex gap-2">
             <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
               {saving ? 'שומר...' : 'שמירה'}
             </button>
