@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int             @id @default(autoincrement())
+  email          String          @unique
+  passwordHash   String
+  name           String
+  role           String          @default("BUILDING_ADMIN") // SUPER_ADMIN | BUILDING_ADMIN
+  createdAt      DateTime        @default(now())
+  buildingAdmins BuildingAdmin[]
+}
+
+// Join table: which buildings a BUILDING_ADMIN user manages.
+// A SUPER_ADMIN bypasses this table entirely and can access every building.
+model BuildingAdmin {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  buildingId Int
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, buildingId])
+}
+
+model Building {
+  id                    Int      @id @default(autoincrement())
+  name                  String   @default("הבניין שלי")
+  address               String   @default("")
+  floors                Int      @default(0)
+  apartmentsCount       Int      @default(0)
+  monthlyFeeDefault     Decimal  @default(0) @db.Decimal(10, 2)
+  openingBalanceCash    Decimal  @default(0) @db.Decimal(10, 2)
+  openingBalanceDigital Decimal  @default(0) @db.Decimal(10, 2)
+  openingBalanceDate    DateTime @default(now())
+  elevatorsCount        Int      @default(0)
+  electricityBenchmark  Decimal  @default(0) @db.Decimal(10, 2)
+  cleaningBenchmark     Decimal  @default(0) @db.Decimal(10, 2)
+  gardeningBenchmark    Decimal  @default(0) @db.Decimal(10, 2)
+  isConfigured          Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  admins     BuildingAdmin[]
+  tenants    Tenant[]
+  tasks      Task[]
+  expenses   Expense[]
+  budgetItems BudgetItem[]
+}
+
+model Tenant {
+  id              Int      @id @default(autoincrement())
+  buildingId      Int
+  building        Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  floor           Int
+  apartmentNumber String
+  name            String
+  phone           String?
+  role            String   @default("OWNER") // OWNER | RENTER
+  monthlyFee      Decimal? @db.Decimal(10, 2) // overrides building default when set
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  dues            Due[]
+}
+
+model Due {
+  id               Int       @id @default(autoincrement())
+  tenantId         Int
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  year             Int
+  month            Int // 1-12
+  amountDue        Decimal   @db.Decimal(10, 2)
+  status           String    @default("UNPAID") // UNPAID | PAID_BANK | PAID_CASH | PENDING_CASH_APPROVAL
+  paidDate         DateTime?
+  reportedByTenant Boolean   @default(false)
+  approvedAt       DateTime?
+  note             String?
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([tenantId, year, month])
+}
+
+model Task {
+  id              Int       @id @default(autoincrement())
+  buildingId      Int
+  building        Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  location        String?
+  urgency         String    @default("רגיל") // רגיל | דחוף
+  status          String    @default("OPEN") // OPEN | IN_PROGRESS | CONTRACTOR | RESOLVED
+  attachmentUrl   String?
+  isRecurring     Boolean   @default(false)
+  recurrenceLabel String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  resolvedAt      DateTime?
+}
+
+model Expense {
+  id           Int      @id @default(autoincrement())
+  buildingId   Int
+  building     Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  date         DateTime
+  category     String
+  description  String?
+  supplierName String?
+  amount       Decimal  @db.Decimal(10, 2)
+  paidFrom     String // CASH | DIGITAL
+  receiptUrl   String?
+  createdAt    DateTime @default(now())
+}
+
+model BudgetItem {
+  id         Int      @id @default(autoincrement())
+  buildingId Int
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  category   String
+  label      String
+  frequency  String // MONTHLY | BIMONTHLY | SEMIANNUAL | ANNUAL
+  amount     Decimal  @db.Decimal(10, 2)
+  months     Int[] // months (1-12) this line applies to
+}
