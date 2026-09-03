@@ -5,6 +5,7 @@ import OnboardingModal from './components/OnboardingModal';
 import AddExpenseModal from './components/AddExpenseModal';
 import ApprovePaymentModal from './components/ApprovePaymentModal';
 import ManageAdminsModal from './components/ManageAdminsModal';
+import ProfessionalsDirectoryModal from './components/ProfessionalsDirectoryModal';
 import AuthScreen from './components/AuthScreen';
 import BuildingSelector from './components/BuildingSelector';
 import AnnouncementsBoard from './components/AnnouncementsBoard';
@@ -27,6 +28,7 @@ export default function App() {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showApprovePayment, setShowApprovePayment] = useState(false);
   const [showManageAdmins, setShowManageAdmins] = useState(false);
+  const [showProfessionals, setShowProfessionals] = useState(false);
 
   useEffect(() => {
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null));
@@ -124,6 +126,7 @@ export default function App() {
         onApprovePayment={() => setShowApprovePayment(true)}
         onOpenSettings={() => setShowSettings(true)}
         onManageAdmins={() => setShowManageAdmins(true)}
+        onOpenProfessionals={() => setShowProfessionals(true)}
         onSwitchBuilding={() => setBuildingId(null)}
         showSwitch={buildings && (buildings.length > 1 || user.role === 'SUPER_ADMIN')}
         onLogout={logout}
@@ -149,6 +152,9 @@ export default function App() {
       )}
       {showManageAdmins && (
         <ManageAdminsModal buildingId={buildingId} currentUserId={user.id} building={building} onClose={() => setShowManageAdmins(false)} />
+      )}
+      {showProfessionals && (
+        <ProfessionalsDirectoryModal onClose={() => setShowProfessionals(false)} />
       )}
     </div>
   );

@@ -17,6 +17,9 @@ const complexesRoutes = require('./routes/complexes');
 const minutesRoutes = require('./routes/minutes');
 const proceduresRoutes = require('./routes/procedures');
 const announcementsRoutes = require('./routes/announcements');
+const { router: publicRoutes } = require('./routes/public');
+const professionalsRoutes = require('./routes/professionals');
+const settingsRoutes = require('./routes/settings');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -28,6 +31,9 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/buildings', buildingsListRoutes);
 app.use('/api/complexes', complexesRoutes);
+app.use('/api/public', publicRoutes);
+app.use('/api/professionals', professionalsRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Every building-scoped resource lives under /api/buildings/:buildingId/... and requires
 // the caller to be authenticated and to have access to that specific building.

@@ -1,7 +1,7 @@
-import { Building2, Wallet, Landmark, Smartphone, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye } from 'lucide-react';
+import { Building2, Wallet, Landmark, Smartphone, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye, Wrench } from 'lucide-react';
 import { formatILS } from '../format';
 
-export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onSwitchBuilding, showSwitch, onLogout, readOnly }) {
+export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onOpenProfessionals, onSwitchBuilding, showSwitch, onLogout, readOnly }) {
   return (
     <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm no-print">
       <div className="max-w-6xl mx-auto px-4 py-3">
@@ -32,6 +32,13 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
                 <LayoutGrid size={20} />
               </button>
             )}
+            <button
+              onClick={onOpenProfessionals}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+              title="בעלי מקצוע"
+            >
+              <Wrench size={20} />
+            </button>
             {!readOnly && (
               <>
                 <button

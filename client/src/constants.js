@@ -30,6 +30,19 @@ export const RECURRING_CHECKLIST = [
   'החלפת ריחנים',
 ];
 
+export const PROFESSION_CATEGORIES = [
+  'חשמלאי',
+  'אינסטלטור',
+  'טכנאי מעליות',
+  'גנן',
+  'מדביר',
+  'צבעי',
+  'מנעולן',
+  'איש ניקיון',
+  'קבלן שיפוצים',
+  'אחר',
+];
+
 export const BUDGET_FREQUENCIES = [
   { value: 'MONTHLY', label: 'חודשי' },
   { value: 'BIMONTHLY', label: 'דו-חודשי' },

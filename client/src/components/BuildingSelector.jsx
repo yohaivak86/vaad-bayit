@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock } from 'lucide-react';
+import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock, Settings2 } from 'lucide-react';
 import { api } from '../api';
 import ComplexesModal from './ComplexesModal';
+import SiteSettingsModal from './SiteSettingsModal';
 
 export default function BuildingSelector({ user, buildings, onSelect, onLogout, onBuildingsChanged }) {
   const [showCreate, setShowCreate] = useState(false);
   const [showComplexes, setShowComplexes] = useState(false);
+  const [showSiteSettings, setShowSiteSettings] = useState(false);
 
   return (
     <div dir="rtl" className="min-h-screen bg-slate-50 px-4 py-8">
@@ -55,12 +57,20 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
         </div>
 
         {user.role === 'SUPER_ADMIN' && (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="w-full flex items-center justify-center gap-1.5 mt-3 border border-dashed border-slate-300 text-slate-500 rounded-xl py-3 text-sm font-medium hover:bg-white transition"
-          >
-            <Plus size={16} /> הוספת בניין חדש
-          </button>
+          <>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="w-full flex items-center justify-center gap-1.5 mt-3 border border-dashed border-slate-300 text-slate-500 rounded-xl py-3 text-sm font-medium hover:bg-white transition"
+            >
+              <Plus size={16} /> הוספת בניין חדש
+            </button>
+            <button
+              onClick={() => setShowSiteSettings(true)}
+              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
+            >
+              <Settings2 size={16} /> הגדרות מערכת
+            </button>
+          </>
         )}
 
         {buildings.length > 0 && (
@@ -81,6 +91,9 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
       )}
       {showComplexes && (
         <ComplexesModal myBuildings={buildings} onClose={() => setShowComplexes(false)} />
+      )}
+      {showSiteSettings && (
+        <SiteSettingsModal onClose={() => setShowSiteSettings(false)} />
       )}
     </div>
   );

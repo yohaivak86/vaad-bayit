@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Building2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Building2, Wrench } from 'lucide-react';
 import { api } from '../api';
+import ProfessionalRegisterModal from './ProfessionalRegisterModal';
 
 const MODES = [
   { key: 'login', label: 'התחברות' },
@@ -13,6 +14,12 @@ export default function AuthScreen({ onAuthenticated }) {
   const [form, setForm] = useState({ email: '', password: '', name: '', buildingName: '', buildingAddress: '', inviteCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(null);
+  const [showProfessionalForm, setShowProfessionalForm] = useState(false);
+
+  useEffect(() => {
+    api.getPublicStats().then(setStats).catch(() => setStats({ show: false }));
+  }, []);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -39,9 +46,16 @@ export default function AuthScreen({ onAuthenticated }) {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex flex-col items-center mb-5">
+    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-sm space-y-3">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="flex flex-col items-center mb-5 relative">
+          {stats?.show && (
+            <div className="absolute -top-1 left-0 flex flex-col items-center justify-center bg-emerald-50 border border-emerald-200 rounded-full w-16 h-16 text-emerald-700">
+              <span className="font-extrabold text-lg leading-none">{stats.buildingsCount}</span>
+              <span className="text-[9px] leading-tight">בניינים</span>
+            </div>
+          )}
           <div className="bg-blue-600 text-white rounded-xl p-2.5 mb-2">
             <Building2 size={24} />
           </div>
@@ -112,6 +126,17 @@ export default function AuthScreen({ onAuthenticated }) {
           </button>
         </form>
       </div>
+
+      <button
+        onClick={() => setShowProfessionalForm(true)}
+        className="w-full flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-2xl px-4 py-3 text-sm font-medium transition"
+      >
+        <Wrench size={16} />
+        בעל מקצוע ורוצה לתת שירות? הירשם כאן
+      </button>
+      </div>
+
+      {showProfessionalForm && <ProfessionalRegisterModal onClose={() => setShowProfessionalForm(false)} />}
     </div>
   );
 }

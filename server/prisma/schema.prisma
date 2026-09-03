@@ -18,6 +18,25 @@ model User {
   ownedComplexes Complex[]
 }
 
+// A tradesperson/contractor who registered interest in offering services through the
+// platform. No login account - just a lead, browsable by building admins as a directory.
+// Track/plan selection (מסלולים) and any paywall are deliberately not modeled yet.
+model Professional {
+  id         Int      @id @default(autoincrement())
+  name       String
+  phone      String
+  email      String?
+  profession String
+  message    String?
+  createdAt  DateTime @default(now())
+}
+
+// Single-row site-wide configuration (not per-building). Always id 1.
+model AppSettings {
+  id                    Int     @id @default(1)
+  showBuildingCountStat Boolean @default(true)
+}
+
 // Join table: which buildings a BUILDING_ADMIN user manages, and with what access.
 // A SUPER_ADMIN bypasses this table entirely and can access every building.
 model BuildingAdmin {

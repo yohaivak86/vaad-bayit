@@ -28,6 +28,17 @@ async function uploadFile(path, file, fieldName) {
 }
 
 export const api = {
+  // Public (no login required)
+  getPublicStats: () => request('/public/stats'),
+  registerProfessional: (data) => request('/public/professionals', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Professionals directory (any logged-in user)
+  getProfessionals: () => request('/professionals'),
+
+  // Site-wide settings (super-admin only)
+  getAppSettings: () => request('/settings'),
+  updateAppSettings: (data) => request('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
   // Auth
   me: () => request('/auth/me'),
   login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
