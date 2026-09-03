@@ -67,6 +67,7 @@ export const api = {
   createTenant: (buildingId, data) => request(`/buildings/${buildingId}/tenants`, { method: 'POST', body: JSON.stringify(data) }),
   updateTenant: (buildingId, id, data) => request(`/buildings/${buildingId}/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTenant: (buildingId, id) => request(`/buildings/${buildingId}/tenants/${id}`, { method: 'DELETE' }),
+  reorderTenants: (buildingId, tenantIds) => request(`/buildings/${buildingId}/tenants/reorder`, { method: 'PUT', body: JSON.stringify({ tenantIds }) }),
 
   // Dues
   getDuesMatrix: (buildingId, year) => request(`/buildings/${buildingId}/dues?year=${year}`),

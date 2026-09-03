@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 
   const tenants = await prisma.tenant.findMany({
     where: { buildingId: req.buildingId, active: true },
-    orderBy: [{ floor: 'asc' }, { apartmentNumber: 'asc' }],
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
     include: { dues: { where: { year }, orderBy: { month: 'asc' } } },
   });
 

@@ -153,6 +153,7 @@ model Tenant {
   role            String   @default("OWNER") // OWNER | RENTER
   monthlyFee      Decimal? @db.Decimal(10, 2) // overrides building default when set
   active          Boolean  @default(true)
+  sortOrder       Int      @default(0) // manual display order, independent of apartmentNumber text
   createdAt       DateTime @default(now())
   dues            Due[]
 }

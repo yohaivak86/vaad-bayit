@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, MessageCircle, Trash2, Pencil, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, MessageCircle, Trash2, Pencil, X, ChevronDown, ChevronUp, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../../api';
 import { formatILS, MONTHS_HE } from '../../format';
 
@@ -38,6 +38,15 @@ export default function TenantsTab({ buildingId, onBalanceChanged, readOnly }) {
     setOpenCell(null);
     await load();
     onBalanceChanged?.();
+  };
+
+  const moveTenant = async (index, direction) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= data.tenants.length) return;
+    const reordered = [...data.tenants];
+    [reordered[index], reordered[newIndex]] = [reordered[newIndex], reordered[index]];
+    setData((d) => ({ ...d, tenants: reordered }));
+    await api.reorderTenants(buildingId, reordered.map((t) => t.id));
   };
 
   const currentYear = new Date().getFullYear();
@@ -80,11 +89,35 @@ export default function TenantsTab({ buildingId, onBalanceChanged, readOnly }) {
               </tr>
             </thead>
             <tbody>
-              {data.tenants.map((tenant) => (
+              {data.tenants.map((tenant, index) => (
                 <tr key={tenant.id} className="border-t border-slate-100 hover:bg-slate-50/60">
                   <td className="sticky right-0 bg-white px-3 py-2 whitespace-nowrap">
-                    <p className="font-semibold text-slate-800">{tenant.name}</p>
-                    <p className="text-xs text-slate-500">קומה {tenant.floor} · דירה {tenant.apartmentNumber}</p>
+                    <div className="flex items-center gap-2">
+                      {!readOnly && (
+                        <div className="flex flex-col shrink-0">
+                          <button
+                            onClick={() => moveTenant(index, -1)}
+                            disabled={index === 0}
+                            className="p-0.5 text-slate-300 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-300"
+                            title="הזזה למעלה"
+                          >
+                            <ArrowUp size={13} />
+                          </button>
+                          <button
+                            onClick={() => moveTenant(index, 1)}
+                            disabled={index === data.tenants.length - 1}
+                            className="p-0.5 text-slate-300 hover:text-slate-700 disabled:opacity-30 disabled:hover:text-slate-300"
+                            title="הזזה למטה"
+                          >
+                            <ArrowDown size={13} />
+                          </button>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-slate-800">{tenant.name}</p>
+                        <p className="text-xs text-slate-500">קומה {tenant.floor} · דירה {tenant.apartmentNumber}</p>
+                      </div>
+                    </div>
                   </td>
                   {tenant.dues.map((due) => (
                     <td key={due.id} className="px-1.5 py-2 text-center relative">
@@ -119,7 +152,7 @@ export default function TenantsTab({ buildingId, onBalanceChanged, readOnly }) {
       {/* Mobile card list */}
       {data && (
         <div className="md:hidden space-y-2">
-          {data.tenants.map((tenant) => {
+          {data.tenants.map((tenant, index) => {
             const isOpen = expandedTenant === tenant.id;
             const unpaidCount = tenant.dues.filter((d) => d.status === 'UNPAID').length;
             return (
@@ -156,12 +189,30 @@ export default function TenantsTab({ buildingId, onBalanceChanged, readOnly }) {
                       </div>
                     ))}
                     {!readOnly && (
-                      <button
-                        onClick={() => setEditingTenant(tenant)}
-                        className="col-span-3 mt-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5"
-                      >
-                        <Pencil size={12} /> עריכת פרטי דייר
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setEditingTenant(tenant)}
+                          className="col-span-3 mt-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5"
+                        >
+                          <Pencil size={12} /> עריכת פרטי דייר
+                        </button>
+                        <div className="col-span-3 flex gap-1.5">
+                          <button
+                            onClick={() => moveTenant(index, -1)}
+                            disabled={index === 0}
+                            className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5 disabled:opacity-30"
+                          >
+                            <ArrowUp size={12} /> הזזה למעלה
+                          </button>
+                          <button
+                            onClick={() => moveTenant(index, 1)}
+                            disabled={index === data.tenants.length - 1}
+                            className="flex-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5 disabled:opacity-30"
+                          >
+                            <ArrowDown size={12} /> הזזה למטה
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
