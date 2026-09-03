@@ -1,7 +1,7 @@
-import { Building2, Wallet, Banknote, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut } from 'lucide-react';
+import { Building2, Wallet, Banknote, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users } from 'lucide-react';
 import { formatILS } from '../format';
 
-export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onSwitchBuilding, showSwitch, onLogout }) {
+export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onSwitchBuilding, showSwitch, onLogout }) {
   return (
     <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm no-print">
       <div className="max-w-6xl mx-auto px-4 py-3">
@@ -27,6 +27,13 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
                 <LayoutGrid size={20} />
               </button>
             )}
+            <button
+              onClick={onManageAdmins}
+              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+              title="ניהול משתמשים"
+            >
+              <Users size={20} />
+            </button>
             <button
               onClick={onOpenSettings}
               className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
@@ -63,7 +70,7 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
             className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg py-2 transition"
           >
             <Plus size={16} />
-            אישור תשלום דייר
+            רישום תשלום דייר
           </button>
         </div>
       </div>

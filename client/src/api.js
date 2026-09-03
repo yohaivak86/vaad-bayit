@@ -29,6 +29,9 @@ export const api = {
   getBuilding: (buildingId) => request(`/buildings/${buildingId}`),
   updateBuilding: (buildingId, data) => request(`/buildings/${buildingId}`, { method: 'PUT', body: JSON.stringify(data) }),
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
+  getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
+  addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
+  removeBuildingAdmin: (buildingId, userId) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'DELETE' }),
 
   // Tenants
   getTenants: (buildingId) => request(`/buildings/${buildingId}/tenants`),

@@ -4,6 +4,7 @@ import TabBar from './components/TabBar';
 import OnboardingModal from './components/OnboardingModal';
 import AddExpenseModal from './components/AddExpenseModal';
 import ApprovePaymentModal from './components/ApprovePaymentModal';
+import ManageAdminsModal from './components/ManageAdminsModal';
 import AuthScreen from './components/AuthScreen';
 import BuildingSelector from './components/BuildingSelector';
 import TenantsTab from './components/tabs/TenantsTab';
@@ -23,6 +24,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showApprovePayment, setShowApprovePayment] = useState(false);
+  const [showManageAdmins, setShowManageAdmins] = useState(false);
 
   useEffect(() => {
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null));
@@ -110,6 +112,7 @@ export default function App() {
         onAddExpense={() => setShowAddExpense(true)}
         onApprovePayment={() => setShowApprovePayment(true)}
         onOpenSettings={() => setShowSettings(true)}
+        onManageAdmins={() => setShowManageAdmins(true)}
         onSwitchBuilding={() => setBuildingId(null)}
         showSwitch={buildings && (buildings.length > 1 || user.role === 'SUPER_ADMIN')}
         onLogout={logout}
@@ -129,6 +132,9 @@ export default function App() {
       )}
       {showApprovePayment && (
         <ApprovePaymentModal buildingId={buildingId} onClose={() => setShowApprovePayment(false)} onApproved={refreshBalance} />
+      )}
+      {showManageAdmins && (
+        <ManageAdminsModal buildingId={buildingId} currentUserId={user.id} onClose={() => setShowManageAdmins(false)} />
       )}
     </div>
   );
