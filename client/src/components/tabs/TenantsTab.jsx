@@ -16,7 +16,7 @@ const STATUS_LABEL = {
   PENDING_CASH_APPROVAL: 'ממתין לאישור',
 };
 
-export default function TenantsTab({ buildingId, onBalanceChanged }) {
+export default function TenantsTab({ buildingId, onBalanceChanged, readOnly }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [data, setData] = useState(null);
   const [openCell, setOpenCell] = useState(null);
@@ -50,12 +50,14 @@ export default function TenantsTab({ buildingId, onBalanceChanged }) {
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <button
-          onClick={() => setShowAddTenant(true)}
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
-        >
-          <Plus size={16} /> דייר חדש
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowAddTenant(true)}
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
+          >
+            <Plus size={16} /> דייר חדש
+          </button>
+        )}
       </div>
 
       <Legend />
@@ -85,12 +87,12 @@ export default function TenantsTab({ buildingId, onBalanceChanged }) {
                   {tenant.dues.map((due) => (
                     <td key={due.id} className="px-1.5 py-2 text-center relative">
                       <button
-                        onClick={() => setOpenCell(openCell === due.id ? null : due.id)}
-                        className={`w-full rounded-md border px-1.5 py-1 text-[11px] font-medium ${STATUS_STYLE[due.status]}`}
+                        onClick={() => !readOnly && setOpenCell(openCell === due.id ? null : due.id)}
+                        className={`w-full rounded-md border px-1.5 py-1 text-[11px] font-medium ${STATUS_STYLE[due.status]} ${readOnly ? 'cursor-default' : ''}`}
                       >
                         {STATUS_LABEL[due.status]}
                       </button>
-                      {openCell === due.id && (
+                      {!readOnly && openCell === due.id && (
                         <DueMenu due={due} onClose={() => setOpenCell(null)} onAction={doAction} />
                       )}
                     </td>
@@ -98,9 +100,11 @@ export default function TenantsTab({ buildingId, onBalanceChanged }) {
                   <td className="px-2 py-2 text-center">
                     <div className="flex items-center gap-1 justify-center">
                       <WhatsAppButton tenant={tenant} />
-                      <button onClick={() => setEditingTenant(tenant)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
-                        <Pencil size={14} />
-                      </button>
+                      {!readOnly && (
+                        <button onClick={() => setEditingTenant(tenant)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100">
+                          <Pencil size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -139,22 +143,24 @@ export default function TenantsTab({ buildingId, onBalanceChanged }) {
                     {tenant.dues.map((due) => (
                       <div key={due.id} className="relative">
                         <button
-                          onClick={() => setOpenCell(openCell === due.id ? null : due.id)}
-                          className={`w-full rounded-md border px-1 py-1.5 text-[11px] font-medium ${STATUS_STYLE[due.status]}`}
+                          onClick={() => !readOnly && setOpenCell(openCell === due.id ? null : due.id)}
+                          className={`w-full rounded-md border px-1 py-1.5 text-[11px] font-medium ${STATUS_STYLE[due.status]} ${readOnly ? 'cursor-default' : ''}`}
                         >
                           {MONTHS_HE[due.month - 1].slice(0, 3)}
                         </button>
-                        {openCell === due.id && (
+                        {!readOnly && openCell === due.id && (
                           <DueMenu due={due} onClose={() => setOpenCell(null)} onAction={doAction} />
                         )}
                       </div>
                     ))}
-                    <button
-                      onClick={() => setEditingTenant(tenant)}
-                      className="col-span-3 mt-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5"
-                    >
-                      <Pencil size={12} /> עריכת פרטי דייר
-                    </button>
+                    {!readOnly && (
+                      <button
+                        onClick={() => setEditingTenant(tenant)}
+                        className="col-span-3 mt-1 flex items-center justify-center gap-1 text-xs text-slate-500 border border-slate-200 rounded-lg py-1.5"
+                      >
+                        <Pencil size={12} /> עריכת פרטי דייר
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

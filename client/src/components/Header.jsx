@@ -1,7 +1,7 @@
-import { Building2, Wallet, Banknote, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users } from 'lucide-react';
+import { Building2, Wallet, Banknote, PiggyBank, Plus, ReceiptText, Settings, LayoutGrid, LogOut, Users, Eye } from 'lucide-react';
 import { formatILS } from '../format';
 
-export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onSwitchBuilding, showSwitch, onLogout }) {
+export default function Header({ building, balance, onAddExpense, onApprovePayment, onOpenSettings, onManageAdmins, onSwitchBuilding, showSwitch, onLogout, readOnly }) {
   return (
     <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm no-print">
       <div className="max-w-6xl mx-auto px-4 py-3">
@@ -11,8 +11,13 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
               <Building2 size={22} />
             </div>
             <div className="min-w-0">
-              <h1 className="font-extrabold text-lg text-slate-800 truncate">
+              <h1 className="font-extrabold text-lg text-slate-800 truncate flex items-center gap-1.5">
                 {building?.name || 'ועד בית'}
+                {readOnly && (
+                  <span className="flex items-center gap-1 text-[10px] font-medium bg-slate-100 text-slate-500 rounded-full px-2 py-0.5 shrink-0">
+                    <Eye size={11} /> צפייה בלבד
+                  </span>
+                )}
               </h1>
               <p className="text-xs text-slate-500 truncate">{building?.address}</p>
             </div>
@@ -27,20 +32,24 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
                 <LayoutGrid size={20} />
               </button>
             )}
-            <button
-              onClick={onManageAdmins}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
-              title="ניהול משתמשים"
-            >
-              <Users size={20} />
-            </button>
-            <button
-              onClick={onOpenSettings}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
-              title="הגדרות"
-            >
-              <Settings size={20} />
-            </button>
+            {!readOnly && (
+              <>
+                <button
+                  onClick={onManageAdmins}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                  title="ניהול משתמשים"
+                >
+                  <Users size={20} />
+                </button>
+                <button
+                  onClick={onOpenSettings}
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                  title="הגדרות"
+                >
+                  <Settings size={20} />
+                </button>
+              </>
+            )}
             <button
               onClick={onLogout}
               className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
@@ -57,22 +66,24 @@ export default function Header({ building, balance, onAddExpense, onApprovePayme
           <SummaryCard icon={Wallet} label='סה"כ קופה כללית' value={balance?.totalBalance} color="emerald" bold />
         </div>
 
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={onAddExpense}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg py-2 transition"
-          >
-            <ReceiptText size={16} />
-            רישום הוצאה
-          </button>
-          <button
-            onClick={onApprovePayment}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg py-2 transition"
-          >
-            <Plus size={16} />
-            רישום תשלום דייר
-          </button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={onAddExpense}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold rounded-lg py-2 transition"
+            >
+              <ReceiptText size={16} />
+              רישום הוצאה
+            </button>
+            <button
+              onClick={onApprovePayment}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg py-2 transition"
+            >
+              <Plus size={16} />
+              רישום תשלום דייר
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

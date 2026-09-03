@@ -45,12 +45,15 @@ export default function App() {
     setBalance(await api.getBalance(buildingId));
   }, [buildingId]);
 
+  const currentBuildingMeta = buildings?.find((b) => b.id === buildingId);
+  const readOnly = currentBuildingMeta?.role === 'VIEWER';
+
   const loadBuilding = useCallback(async () => {
     if (!buildingId) return;
     const b = await api.getBuilding(buildingId);
     setBuilding(b);
-    if (!b.isConfigured) setShowSettings(true);
-  }, [buildingId]);
+    if (!b.isConfigured && !readOnly) setShowSettings(true);
+  }, [buildingId, readOnly]);
 
   useEffect(() => {
     if (buildingId) {
@@ -116,13 +119,14 @@ export default function App() {
         onSwitchBuilding={() => setBuildingId(null)}
         showSwitch={buildings && (buildings.length > 1 || user.role === 'SUPER_ADMIN')}
         onLogout={logout}
+        readOnly={readOnly}
       />
       <TabBar active={tab} onChange={setTab} />
 
-      {tab === 'tenants' && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} />}
-      {tab === 'tasks' && <TasksTab buildingId={buildingId} />}
-      {tab === 'expenses' && <ExpensesTab buildingId={buildingId} building={building} />}
-      {tab === 'budget' && <BudgetTab buildingId={buildingId} />}
+      {tab === 'tenants' && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={readOnly} />}
+      {tab === 'tasks' && <TasksTab buildingId={buildingId} readOnly={readOnly} />}
+      {tab === 'expenses' && <ExpensesTab buildingId={buildingId} building={building} readOnly={readOnly} />}
+      {tab === 'budget' && <BudgetTab buildingId={buildingId} readOnly={readOnly} />}
 
       {showSettings && (
         <OnboardingModal building={building} onClose={() => setShowSettings(false)} onSave={saveSettings} />

@@ -4,7 +4,7 @@ import { api } from '../../api';
 import { TASK_STATUSES, RECURRING_CHECKLIST } from '../../constants';
 import { formatDateHe } from '../../format';
 
-export default function TasksTab({ buildingId }) {
+export default function TasksTab({ buildingId, readOnly }) {
   const [tasks, setTasks] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('ALL');
@@ -33,12 +33,14 @@ export default function TasksTab({ buildingId }) {
     <div className="max-w-6xl mx-auto px-4 py-4 pb-24 sm:pb-6">
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h2 className="font-bold text-slate-800">משימות ותקלות פתוחות</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
-        >
-          <Plus size={16} /> תקלה / משימה חדשה
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
+          >
+            <Plus size={16} /> תקלה / משימה חדשה
+          </button>
+        )}
       </div>
 
       <div className="flex gap-1.5 mb-3 flex-wrap">
@@ -48,32 +50,34 @@ export default function TasksTab({ buildingId }) {
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4">
-        <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-          <CheckSquare size={15} /> משימות תקופתיות קבועות
-        </p>
-        <div className="flex flex-wrap gap-1.5">
-          {RECURRING_CHECKLIST.map((label) => (
-            <button
-              key={label}
-              onClick={() => addRecurring(label)}
-              className="text-xs border border-slate-200 rounded-full px-3 py-1.5 text-slate-600 hover:bg-slate-50"
-            >
-              + {label}
-            </button>
-          ))}
+      {!readOnly && (
+        <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4">
+          <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
+            <CheckSquare size={15} /> משימות תקופתיות קבועות
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {RECURRING_CHECKLIST.map((label) => (
+              <button
+                key={label}
+                onClick={() => addRecurring(label)}
+                className="text-xs border border-slate-200 rounded-full px-3 py-1.5 text-slate-600 hover:bg-slate-50"
+              >
+                + {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {!tasks && <p className="text-sm text-slate-500">טוען...</p>}
       <div className="space-y-2">
         {filtered.map((task) => (
-          <TaskCard key={task.id} task={task} onStatusChange={updateStatus} onDelete={remove} />
+          <TaskCard key={task.id} task={task} onStatusChange={updateStatus} onDelete={remove} readOnly={readOnly} />
         ))}
         {tasks && filtered.length === 0 && <p className="text-sm text-slate-400 text-center py-8">אין משימות בסטטוס זה</p>}
       </div>
 
-      {showForm && (
+      {!readOnly && showForm && (
         <TaskFormModal
           onClose={() => setShowForm(false)}
           onSave={async (form) => { await api.createTask(buildingId, form); setShowForm(false); await load(); }}
@@ -96,8 +100,7 @@ function FilterChip({ label, active, onClick }) {
   );
 }
 
-function TaskCard({ task, onStatusChange, onDelete }) {
-  const statusDef = TASK_STATUSES.find((s) => s.value === task.status);
+function TaskCard({ task, onStatusChange, onDelete, readOnly }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-3">
       <div className="flex items-start justify-between gap-2">
@@ -115,18 +118,21 @@ function TaskCard({ task, onStatusChange, onDelete }) {
             {task.isRecurring && <span className="text-blue-500">תקופתי</span>}
           </div>
         </div>
-        <button onClick={() => onDelete(task)} className="p-1 text-slate-300 hover:text-red-500 shrink-0">
-          <Trash2 size={14} />
-        </button>
+        {!readOnly && (
+          <button onClick={() => onDelete(task)} className="p-1 text-slate-300 hover:text-red-500 shrink-0">
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
       <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
         {TASK_STATUSES.map((s) => (
           <button
             key={s.value}
-            onClick={() => onStatusChange(task, s.value)}
+            onClick={() => !readOnly && onStatusChange(task, s.value)}
+            disabled={readOnly}
             className={`text-[11px] rounded-md px-2 py-1 font-medium transition ${
               task.status === s.value ? s.color : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-            }`}
+            } ${readOnly ? 'cursor-default' : ''}`}
           >
             {s.label}
           </button>

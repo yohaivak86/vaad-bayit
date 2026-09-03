@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { X, Trash2, UserPlus, Copy, RefreshCw, Check } from 'lucide-react';
 import { api } from '../api';
 
+const ROLE_LABEL = { ADMIN: 'עריכה מלאה', VIEWER: 'צפייה בלבד' };
+
 export default function ManageAdminsModal({ buildingId, currentUserId, building, onClose }) {
   const [admins, setAdmins] = useState(null);
-  const [form, setForm] = useState({ email: '', name: '', password: '' });
+  const [form, setForm] = useState({ email: '', name: '', password: '', role: 'ADMIN' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [inviteCode, setInviteCode] = useState(building?.inviteCode || '');
@@ -21,7 +23,7 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
     setSaving(true);
     try {
       await api.addBuildingAdmin(buildingId, form);
-      setForm({ email: '', name: '', password: '' });
+      setForm({ email: '', name: '', password: '', role: 'ADMIN' });
       await load();
     } catch (err) {
       setError(err.message);
@@ -31,8 +33,19 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
   };
 
   const remove = async (userId) => {
+    setError('');
     try {
       await api.removeBuildingAdmin(buildingId, userId);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const changeRole = async (userId, role) => {
+    setError('');
+    try {
+      await api.updateBuildingAdminRole(buildingId, userId, role);
       await load();
     } catch (err) {
       setError(err.message);
@@ -66,7 +79,8 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
           <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-3">
             <p className="text-xs font-semibold text-blue-800 mb-1.5">קוד הזמנה לבניין</p>
             <p className="text-[11px] text-blue-700 mb-2">
-              כל מי שנרשם עם הקוד הזה (בטאב "הצטרפות" במסך ההתחברות) יצטרף כאדמין לבניין הזה.
+              כל מי שנרשם עם הקוד הזה (בטאב "הצטרפות" במסך ההתחברות) יצטרף כאדמין עם הרשאת עריכה מלאה.
+              עבור הרשאת צפייה בלבד יש להוסיף למטה ידנית.
             </p>
             <div className="flex items-center gap-2">
               <span className="flex-1 font-mono tracking-widest text-center bg-white border border-blue-200 rounded-lg py-1.5 text-sm text-blue-900">
@@ -89,18 +103,32 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
                   <p className="font-semibold text-sm text-slate-800">{a.name}</p>
                   <p className="text-xs text-slate-500">{a.email}</p>
                 </div>
-                {a.userId !== currentUserId && (
-                  <button onClick={() => remove(a.userId)} className="p-1.5 text-slate-300 hover:text-red-500">
-                    <Trash2 size={15} />
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {a.userId === currentUserId ? (
+                    <span className="text-xs text-slate-400">{ROLE_LABEL[a.role]}</span>
+                  ) : (
+                    <select
+                      value={a.role}
+                      onChange={(e) => changeRole(a.userId, e.target.value)}
+                      className="text-xs border border-slate-200 rounded-md px-1.5 py-1"
+                    >
+                      <option value="ADMIN">עריכה מלאה</option>
+                      <option value="VIEWER">צפייה בלבד</option>
+                    </select>
+                  )}
+                  {a.userId !== currentUserId && (
+                    <button onClick={() => remove(a.userId)} className="p-1.5 text-slate-300 hover:text-red-500">
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
 
           <form onSubmit={submit} className="border-t border-slate-100 pt-4 space-y-3">
             <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
-              <UserPlus size={14} /> או להוסיף אדמין ישירות (עם סיסמה שאת קובעת)
+              <UserPlus size={14} /> הוספת משתמש (עם סיסמה שאת קובעת)
             </p>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">שם מלא</label>
@@ -113,6 +141,23 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">סיסמה (רק אם זה משתמש חדש)</label>
               <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className="input" minLength={8} placeholder="לפחות 8 תווים" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">הרשאה</label>
+              <div className="flex gap-2">
+                {[{ v: 'ADMIN', label: 'עריכה מלאה' }, { v: 'VIEWER', label: 'צפייה בלבד' }].map((opt) => (
+                  <button
+                    type="button"
+                    key={opt.v}
+                    onClick={() => set('role', opt.v)}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
+                      form.role === opt.v ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             <button type="submit" disabled={saving} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">

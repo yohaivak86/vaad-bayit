@@ -18,7 +18,7 @@ model User {
   ownedComplexes Complex[]
 }
 
-// Join table: which buildings a BUILDING_ADMIN user manages.
+// Join table: which buildings a BUILDING_ADMIN user manages, and with what access.
 // A SUPER_ADMIN bypasses this table entirely and can access every building.
 model BuildingAdmin {
   id         Int      @id @default(autoincrement())
@@ -26,6 +26,7 @@ model BuildingAdmin {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   buildingId Int
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  role       String   @default("ADMIN") // ADMIN (full edit) | VIEWER (read-only)
   createdAt  DateTime @default(now())
 
   @@unique([userId, buildingId])

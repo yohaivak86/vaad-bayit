@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const { requireAuth, requireBuildingAccess } = require('./middleware/auth');
+const { requireAuth, requireBuildingAccess, blockViewerWrites } = require('./middleware/auth');
 const authRoutes = require('./routes/auth');
 const buildingsListRoutes = require('./routes/buildings');
 const buildingRoutes = require('./routes/building');
@@ -36,7 +36,7 @@ buildingScope.use('/tasks', tasksRoutes);
 buildingScope.use('/expenses', expensesRoutes);
 buildingScope.use('/budget', budgetRoutes);
 
-app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, buildingScope);
+app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, blockViewerWrites, buildingScope);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

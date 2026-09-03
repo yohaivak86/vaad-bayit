@@ -13,13 +13,15 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-// Verifies req.user (set by requireAuth) can access the building in req.params.buildingId.
+// Verifies req.user (set by requireAuth) can access the building in req.params.buildingId,
+// and records their access level (req.buildingRole) so writes can be blocked for viewers.
 async function requireBuildingAccess(req, res, next) {
   const buildingId = Number(req.params.buildingId);
   if (!buildingId) return res.status(400).json({ error: 'buildingId חסר' });
 
   if (req.user.role === 'SUPER_ADMIN') {
     req.buildingId = buildingId;
+    req.buildingRole = 'ADMIN';
     return next();
   }
 
@@ -29,7 +31,16 @@ async function requireBuildingAccess(req, res, next) {
   if (!membership) return res.status(403).json({ error: 'אין הרשאה לבניין זה' });
 
   req.buildingId = buildingId;
+  req.buildingRole = membership.role;
   next();
 }
 
-module.exports = { requireAuth, requireBuildingAccess };
+// Blocks any write (non-GET) request from a VIEWER - they can look but not touch.
+function blockViewerWrites(req, res, next) {
+  if (req.method !== 'GET' && req.buildingRole === 'VIEWER') {
+    return res.status(403).json({ error: 'למשתמש צפייה בלבד אין הרשאה לבצע שינויים' });
+  }
+  next();
+}
+
+module.exports = { requireAuth, requireBuildingAccess, blockViewerWrites };

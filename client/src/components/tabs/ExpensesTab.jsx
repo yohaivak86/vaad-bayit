@@ -12,7 +12,7 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ExpensesTab({ buildingId, building }) {
+export default function ExpensesTab({ buildingId, building, readOnly }) {
   const [filters, setFilters] = useState({ from: firstOfMonth(), to: today(), category: '', paidFrom: '' });
   const [expenses, setExpenses] = useState(null);
   const [summary, setSummary] = useState(null);
@@ -111,7 +111,7 @@ export default function ExpensesTab({ buildingId, building }) {
               <th className="px-3 py-2 text-start font-semibold hidden sm:table-cell">ספק</th>
               <th className="px-3 py-2 text-start font-semibold">מקור</th>
               <th className="px-3 py-2 text-start font-semibold">סכום</th>
-              <th className="px-3 py-2 no-print"></th>
+              {!readOnly && <th className="px-3 py-2 no-print"></th>}
             </tr>
           </thead>
           <tbody>
@@ -122,9 +122,11 @@ export default function ExpensesTab({ buildingId, building }) {
                 <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{e.supplierName || '—'}</td>
                 <td className="px-3 py-2">{e.paidFrom === 'CASH' ? 'מזומן' : 'בנק'}</td>
                 <td className="px-3 py-2 font-medium">{formatILS(e.amount)}</td>
-                <td className="px-3 py-2 no-print">
-                  <button onClick={() => remove(e.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
-                </td>
+                {!readOnly && (
+                  <td className="px-3 py-2 no-print">
+                    <button onClick={() => remove(e.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+                  </td>
+                )}
               </tr>
             ))}
             {expenses?.length === 0 && (

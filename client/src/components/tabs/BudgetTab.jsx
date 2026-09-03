@@ -4,7 +4,7 @@ import { api } from '../../api';
 import { EXPENSE_CATEGORIES, BUDGET_FREQUENCIES } from '../../constants';
 import { formatILS, MONTHS_HE } from '../../format';
 
-export default function BudgetTab({ buildingId }) {
+export default function BudgetTab({ buildingId, readOnly }) {
   const [items, setItems] = useState(null);
   const [projection, setProjection] = useState(null);
   const [year, setYear] = useState(new Date().getFullYear());
@@ -35,12 +35,14 @@ export default function BudgetTab({ buildingId }) {
             {years.map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
-        >
-          <Plus size={16} /> סעיף תקציבי
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
+          >
+            <Plus size={16} /> סעיף תקציבי
+          </button>
+        )}
       </div>
 
       {deficitMonth && (
@@ -93,7 +95,7 @@ export default function BudgetTab({ buildingId }) {
               <th className="px-3 py-2 text-start font-semibold hidden sm:table-cell">קטגוריה</th>
               <th className="px-3 py-2 text-start font-semibold">תדירות</th>
               <th className="px-3 py-2 text-start font-semibold">סכום</th>
-              <th className="px-3 py-2 no-print"></th>
+              {!readOnly && <th className="px-3 py-2 no-print"></th>}
             </tr>
           </thead>
           <tbody>
@@ -103,9 +105,11 @@ export default function BudgetTab({ buildingId }) {
                 <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{item.category}</td>
                 <td className="px-3 py-2">{BUDGET_FREQUENCIES.find((f) => f.value === item.frequency)?.label}</td>
                 <td className="px-3 py-2">{formatILS(item.amount)}</td>
-                <td className="px-3 py-2">
-                  <button onClick={() => remove(item.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
-                </td>
+                {!readOnly && (
+                  <td className="px-3 py-2">
+                    <button onClick={() => remove(item.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+                  </td>
+                )}
               </tr>
             ))}
             {items?.length === 0 && (
@@ -115,7 +119,7 @@ export default function BudgetTab({ buildingId }) {
         </table>
       </div>
 
-      {showForm && (
+      {!readOnly && showForm && (
         <BudgetItemFormModal
           onClose={() => setShowForm(false)}
           onSave={async (form) => { await api.createBudgetItem(buildingId, form); setShowForm(false); await load(); }}

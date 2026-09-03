@@ -7,17 +7,18 @@ const { generateInviteCode } = require('../lib/inviteCode');
 const router = express.Router();
 
 // Buildings the logged-in user can access: all of them for SUPER_ADMIN, only their own otherwise.
+// Each building carries the caller's own access level (role) so the client can hide edit UI for viewers.
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'SUPER_ADMIN') {
     const buildings = await prisma.building.findMany({ orderBy: { name: 'asc' } });
-    return res.json(buildings);
+    return res.json(buildings.map((b) => ({ ...b, role: 'ADMIN' })));
   }
   const memberships = await prisma.buildingAdmin.findMany({
     where: { userId: req.user.id },
     include: { building: true },
     orderBy: { building: { name: 'asc' } },
   });
-  res.json(memberships.map((m) => m.building));
+  res.json(memberships.map((m) => ({ ...m.building, role: m.role })));
 });
 
 // SUPER_ADMIN only: provision a new building and its admin account.

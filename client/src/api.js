@@ -32,6 +32,7 @@ export const api = {
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
   getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
   addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
+  updateBuildingAdminRole: (buildingId, userId, role) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   removeBuildingAdmin: (buildingId, userId) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'DELETE' }),
   regenerateInviteCode: (buildingId) => request(`/buildings/${buildingId}/invite-code/regenerate`, { method: 'POST' }),
 

@@ -61,19 +61,22 @@ router.post('/invite-code/regenerate', async (req, res) => {
   res.status(500).json({ error: 'לא הצלחנו ליצור קוד הזמנה, נסו שוב' });
 });
 
-// Co-admins of this specific building (a committee typically has more than one member).
+const VALID_ROLES = ['ADMIN', 'VIEWER'];
+
+// Co-admins/viewers of this specific building (a committee typically has more than one member).
 router.get('/admins', async (req, res) => {
   const memberships = await prisma.buildingAdmin.findMany({
     where: { buildingId: req.buildingId },
     include: { user: true },
     orderBy: { createdAt: 'asc' },
   });
-  res.json(memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email })));
+  res.json(memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role })));
 });
 
 router.post('/admins', async (req, res) => {
-  const { email, name, password } = req.body;
+  const { email, name, password, role } = req.body;
   if (!email || !name) return res.status(400).json({ error: 'email ו-name הם שדות חובה' });
+  const membershipRole = role && VALID_ROLES.includes(role) ? role : 'ADMIN';
 
   const normalizedEmail = email.toLowerCase();
   let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -90,16 +93,33 @@ router.post('/admins', async (req, res) => {
   const existingMembership = await prisma.buildingAdmin.findUnique({
     where: { userId_buildingId: { userId: user.id, buildingId: req.buildingId } },
   });
-  if (existingMembership) return res.status(409).json({ error: 'המשתמש כבר מנהל את הבניין הזה' });
+  if (existingMembership) return res.status(409).json({ error: 'המשתמש כבר משויך לבניין הזה' });
 
-  await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId } });
-  res.status(201).json({ userId: user.id, name: user.name, email: user.email });
+  await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId, role: membershipRole } });
+  res.status(201).json({ userId: user.id, name: user.name, email: user.email, role: membershipRole });
+});
+
+router.put('/admins/:userId', async (req, res) => {
+  const userId = Number(req.params.userId);
+  const { role } = req.body;
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות ADMIN או VIEWER' });
+
+  if (role === 'VIEWER') {
+    const remainingAdmins = await prisma.buildingAdmin.count({ where: { buildingId: req.buildingId, role: 'ADMIN', userId: { not: userId } } });
+    if (remainingAdmins === 0) return res.status(400).json({ error: 'לא ניתן להשאיר את הבניין ללא אף אדמין עם הרשאת עריכה' });
+  }
+
+  const updated = await prisma.buildingAdmin.update({
+    where: { userId_buildingId: { userId, buildingId: req.buildingId } },
+    data: { role },
+  });
+  res.json({ userId, role: updated.role });
 });
 
 router.delete('/admins/:userId', async (req, res) => {
   const userId = Number(req.params.userId);
-  const remainingCount = await prisma.buildingAdmin.count({ where: { buildingId: req.buildingId } });
-  if (remainingCount <= 1) {
+  const remainingAdmins = await prisma.buildingAdmin.count({ where: { buildingId: req.buildingId, role: 'ADMIN', userId: { not: userId } } });
+  if (remainingAdmins === 0) {
     return res.status(400).json({ error: 'לא ניתן להסיר את האדמין האחרון של הבניין' });
   }
   await prisma.buildingAdmin.delete({
