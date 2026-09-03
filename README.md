@@ -32,7 +32,7 @@ cp server/.env.example server/.env
 
 3. יצירת הטבלאות במסד הנתונים:
 ```bash
-cd server && npx prisma migrate dev --name init && cd ..
+cd server && npx prisma db push && cd ..
 ```
 
 4. טעינת נתוני דוגמה - יוצר משתמש-על (super admin) וגם בניין לדוגמה "נחל דליות 8" עם 14 דירות:
