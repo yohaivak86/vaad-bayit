@@ -14,6 +14,9 @@ const tasksRoutes = require('./routes/tasks');
 const expensesRoutes = require('./routes/expenses');
 const budgetRoutes = require('./routes/budget');
 const complexesRoutes = require('./routes/complexes');
+const minutesRoutes = require('./routes/minutes');
+const proceduresRoutes = require('./routes/procedures');
+const announcementsRoutes = require('./routes/announcements');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,6 +38,9 @@ buildingScope.use('/dues', duesRoutes);
 buildingScope.use('/tasks', tasksRoutes);
 buildingScope.use('/expenses', expensesRoutes);
 buildingScope.use('/budget', budgetRoutes);
+buildingScope.use('/minutes', minutesRoutes);
+buildingScope.use('/procedures', proceduresRoutes);
+buildingScope.use('/announcements', announcementsRoutes);
 
 app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, blockViewerWrites, buildingScope);
 

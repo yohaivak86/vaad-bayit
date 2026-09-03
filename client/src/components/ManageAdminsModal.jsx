@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Trash2, UserPlus, Copy, RefreshCw, Check } from 'lucide-react';
+import { X, Trash2, UserPlus, Copy, RefreshCw, Check, UserCheck, Clock } from 'lucide-react';
 import { api } from '../api';
 
 const ROLE_LABEL = { ADMIN: 'עריכה מלאה', VIEWER: 'צפייה בלבד' };
@@ -52,6 +52,16 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
     }
   };
 
+  const approve = async (userId, role) => {
+    setError('');
+    try {
+      await api.approveBuildingAdmin(buildingId, userId, role);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const copyCode = async () => {
     try {
       await navigator.clipboard.writeText(inviteCode);
@@ -95,9 +105,19 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
             </div>
           </div>
 
+          {admins === null && <p className="text-sm text-slate-500">טוען...</p>}
+
+          {admins?.some((a) => a.status === 'PENDING') && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5"><Clock size={13} /> ממתינים לאישור</p>
+              {admins.filter((a) => a.status === 'PENDING').map((a) => (
+                <PendingRow key={a.userId} admin={a} onApprove={approve} onReject={remove} />
+              ))}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {admins === null && <p className="text-sm text-slate-500">טוען...</p>}
-            {admins?.map((a) => (
+            {admins?.filter((a) => a.status === 'ACTIVE').map((a) => (
               <div key={a.userId} className="flex items-center justify-between border border-slate-200 rounded-xl px-3 py-2.5">
                 <div>
                   <p className="font-semibold text-sm text-slate-800">{a.name}</p>
@@ -165,6 +185,35 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
             </button>
           </form>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function PendingRow({ admin, onApprove, onReject }) {
+  const [role, setRole] = useState('ADMIN');
+  return (
+    <div className="border border-amber-200 bg-amber-50 rounded-xl px-3 py-2.5">
+      <p className="font-semibold text-sm text-slate-800">{admin.name}</p>
+      <p className="text-xs text-slate-500 mb-2">{admin.email}</p>
+      <div className="flex items-center gap-2">
+        <select value={role} onChange={(e) => setRole(e.target.value)} className="text-xs border border-slate-200 rounded-md px-1.5 py-1.5 bg-white">
+          <option value="ADMIN">עריכה מלאה</option>
+          <option value="VIEWER">צפייה בלבד</option>
+        </select>
+        <button
+          onClick={() => onApprove(admin.userId, role)}
+          className="flex-1 flex items-center justify-center gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md py-1.5 transition"
+        >
+          <UserCheck size={13} /> אישור
+        </button>
+        <button
+          onClick={() => onReject(admin.userId)}
+          className="p-1.5 text-slate-400 hover:text-red-500"
+          title="דחייה"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
     </div>
   );

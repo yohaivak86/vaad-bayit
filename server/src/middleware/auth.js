@@ -29,6 +29,9 @@ async function requireBuildingAccess(req, res, next) {
     where: { userId_buildingId: { userId: req.user.id, buildingId } },
   });
   if (!membership) return res.status(403).json({ error: 'אין הרשאה לבניין זה' });
+  if (membership.status === 'PENDING') {
+    return res.status(403).json({ error: 'הבקשה שלך להצטרף לבניין ממתינה לאישור מנהל' });
+  }
 
   req.buildingId = buildingId;
   req.buildingRole = membership.role;

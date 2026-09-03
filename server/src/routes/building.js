@@ -63,14 +63,15 @@ router.post('/invite-code/regenerate', async (req, res) => {
 
 const VALID_ROLES = ['ADMIN', 'VIEWER'];
 
-// Co-admins/viewers of this specific building (a committee typically has more than one member).
+// Co-admins/viewers of this specific building (a committee typically has more than one member),
+// including anyone who joined with the invite code and is still awaiting approval.
 router.get('/admins', async (req, res) => {
   const memberships = await prisma.buildingAdmin.findMany({
     where: { buildingId: req.buildingId },
     include: { user: true },
     orderBy: { createdAt: 'asc' },
   });
-  res.json(memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role })));
+  res.json(memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role, status: m.status })));
 });
 
 router.post('/admins', async (req, res) => {
@@ -95,8 +96,22 @@ router.post('/admins', async (req, res) => {
   });
   if (existingMembership) return res.status(409).json({ error: 'המשתמש כבר משויך לבניין הזה' });
 
-  await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId, role: membershipRole } });
-  res.status(201).json({ userId: user.id, name: user.name, email: user.email, role: membershipRole });
+  // An existing admin is adding this user directly, which is itself the approval step.
+  await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId, role: membershipRole, status: 'ACTIVE' } });
+  res.status(201).json({ userId: user.id, name: user.name, email: user.email, role: membershipRole, status: 'ACTIVE' });
+});
+
+// Approves a PENDING join request (from the invite-code flow) and assigns its role.
+router.post('/admins/:userId/approve', async (req, res) => {
+  const userId = Number(req.params.userId);
+  const { role } = req.body;
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות ADMIN או VIEWER' });
+
+  const updated = await prisma.buildingAdmin.update({
+    where: { userId_buildingId: { userId, buildingId: req.buildingId } },
+    data: { role, status: 'ACTIVE' },
+  });
+  res.json({ userId, role: updated.role, status: updated.status });
 });
 
 router.put('/admins/:userId', async (req, res) => {
@@ -105,7 +120,9 @@ router.put('/admins/:userId', async (req, res) => {
   if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות ADMIN או VIEWER' });
 
   if (role === 'VIEWER') {
-    const remainingAdmins = await prisma.buildingAdmin.count({ where: { buildingId: req.buildingId, role: 'ADMIN', userId: { not: userId } } });
+    const remainingAdmins = await prisma.buildingAdmin.count({
+      where: { buildingId: req.buildingId, role: 'ADMIN', status: 'ACTIVE', userId: { not: userId } },
+    });
     if (remainingAdmins === 0) return res.status(400).json({ error: 'לא ניתן להשאיר את הבניין ללא אף אדמין עם הרשאת עריכה' });
   }
 
@@ -116,15 +133,20 @@ router.put('/admins/:userId', async (req, res) => {
   res.json({ userId, role: updated.role });
 });
 
+// Also used to reject a still-PENDING join request.
 router.delete('/admins/:userId', async (req, res) => {
   const userId = Number(req.params.userId);
-  const remainingAdmins = await prisma.buildingAdmin.count({ where: { buildingId: req.buildingId, role: 'ADMIN', userId: { not: userId } } });
-  if (remainingAdmins === 0) {
-    return res.status(400).json({ error: 'לא ניתן להסיר את האדמין האחרון של הבניין' });
+  const target = await prisma.buildingAdmin.findUnique({ where: { userId_buildingId: { userId, buildingId: req.buildingId } } });
+  if (!target) return res.status(404).json({ error: 'המשתמש לא נמצא' });
+
+  if (target.status === 'ACTIVE' && target.role === 'ADMIN') {
+    const remainingAdmins = await prisma.buildingAdmin.count({
+      where: { buildingId: req.buildingId, role: 'ADMIN', status: 'ACTIVE', userId: { not: userId } },
+    });
+    if (remainingAdmins === 0) return res.status(400).json({ error: 'לא ניתן להסיר את האדמין האחרון של הבניין' });
   }
-  await prisma.buildingAdmin.delete({
-    where: { userId_buildingId: { userId, buildingId: req.buildingId } },
-  }).catch(() => null);
+
+  await prisma.buildingAdmin.delete({ where: { userId_buildingId: { userId, buildingId: req.buildingId } } });
   res.status(204).end();
 });
 

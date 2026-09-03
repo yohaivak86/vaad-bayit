@@ -52,6 +52,8 @@ router.post('/register', async (req, res) => {
 });
 
 // Self-service signup for a NEW user joining an EXISTING building via its invite code.
+// The membership starts PENDING - an existing admin of that building must approve it
+// (and choose its role) before the new user gets any access.
 router.post('/join-building', async (req, res) => {
   const { email, password, name, inviteCode } = req.body;
   if (!inviteCode) return res.status(400).json({ error: 'inviteCode הוא שדה חובה' });
@@ -63,7 +65,7 @@ router.post('/join-building', async (req, res) => {
   try {
     user = await prisma.$transaction(async (tx) => {
       const newUser = await createUserAccount(tx, { email, password, name });
-      await tx.buildingAdmin.create({ data: { userId: newUser.id, buildingId: building.id } });
+      await tx.buildingAdmin.create({ data: { userId: newUser.id, buildingId: building.id, status: 'PENDING' } });
       return newUser;
     });
   } catch (err) {
@@ -73,7 +75,7 @@ router.post('/join-building', async (req, res) => {
 
   const token = signToken(user);
   setSessionCookie(res, token);
-  res.status(201).json({ user: publicUser(user), buildingId: building.id, buildingName: building.name });
+  res.status(201).json({ user: publicUser(user), buildingId: building.id, buildingName: building.name, pending: true });
 });
 
 router.post('/login', async (req, res) => {

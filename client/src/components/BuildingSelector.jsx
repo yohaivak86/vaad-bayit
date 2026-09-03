@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, ChevronLeft, LogOut, Plus, X, Users2 } from 'lucide-react';
+import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock } from 'lucide-react';
 import { api } from '../api';
 import ComplexesModal from './ComplexesModal';
 
@@ -21,24 +21,34 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
         </div>
 
         <div className="space-y-2">
-          {buildings.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => onSelect(b.id)}
-              className="w-full flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3.5 hover:border-blue-300 hover:shadow-sm transition"
-            >
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-50 text-blue-600 rounded-lg p-2">
-                  <Building2 size={18} />
+          {buildings.map((b) => {
+            const isPending = b.status === 'PENDING';
+            return (
+              <button
+                key={b.id}
+                onClick={() => !isPending && onSelect(b.id)}
+                disabled={isPending}
+                className={`w-full flex items-center justify-between bg-white border rounded-xl px-4 py-3.5 transition ${
+                  isPending ? 'border-amber-200 bg-amber-50 cursor-default' : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`rounded-lg p-2 ${isPending ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <Building2 size={18} />
+                  </div>
+                  <div className="text-start">
+                    <p className="font-semibold text-slate-800 text-sm">{b.name}</p>
+                    {isPending ? (
+                      <p className="text-xs text-amber-700 flex items-center gap-1"><Clock size={11} /> ממתין לאישור מנהל הבניין</p>
+                    ) : (
+                      <p className="text-xs text-slate-500">{b.address}</p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-start">
-                  <p className="font-semibold text-slate-800 text-sm">{b.name}</p>
-                  <p className="text-xs text-slate-500">{b.address}</p>
-                </div>
-              </div>
-              <ChevronLeft size={18} className="text-slate-300" />
-            </button>
-          ))}
+                {!isPending && <ChevronLeft size={18} className="text-slate-300" />}
+              </button>
+            );
+          })}
           {buildings.length === 0 && (
             <p className="text-sm text-slate-400 text-center py-6">אין עדיין בניינים משויכים לחשבון</p>
           )}

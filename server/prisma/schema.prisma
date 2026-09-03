@@ -26,7 +26,8 @@ model BuildingAdmin {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   buildingId Int
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  role       String   @default("ADMIN") // ADMIN (full edit) | VIEWER (read-only)
+  role       String   @default("ADMIN") // ADMIN (full edit) | VIEWER (read-only) - meaningless while PENDING
+  status     String   @default("ACTIVE") // ACTIVE | PENDING (self-service invite-code joins wait for an admin to approve)
   createdAt  DateTime @default(now())
 
   @@unique([userId, buildingId])
@@ -51,12 +52,46 @@ model Building {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  admins        BuildingAdmin[]
-  tenants       Tenant[]
-  tasks         Task[]
-  expenses      Expense[]
-  budgetItems   BudgetItem[]
-  complexMember ComplexMember?
+  admins          BuildingAdmin[]
+  tenants         Tenant[]
+  tasks           Task[]
+  expenses        Expense[]
+  budgetItems     BudgetItem[]
+  complexMember   ComplexMember?
+  meetingMinutes  MeetingMinutes[]
+  procedures      Procedure[]
+  announcements   Announcement[]
+}
+
+model MeetingMinutes {
+  id            Int      @id @default(autoincrement())
+  buildingId    Int
+  building      Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title         String
+  date          DateTime
+  content       String?
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+}
+
+model Procedure {
+  id            Int      @id @default(autoincrement())
+  buildingId    Int
+  building      Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title         String
+  content       String?
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Announcement {
+  id         Int      @id @default(autoincrement())
+  buildingId Int
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title      String
+  body       String?
+  createdAt  DateTime @default(now())
 }
 
 // A complex (מתחם) groups several buildings that share costs (shared gardening,

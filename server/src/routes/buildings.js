@@ -11,14 +11,14 @@ const router = express.Router();
 router.get('/', requireAuth, async (req, res) => {
   if (req.user.role === 'SUPER_ADMIN') {
     const buildings = await prisma.building.findMany({ orderBy: { name: 'asc' } });
-    return res.json(buildings.map((b) => ({ ...b, role: 'ADMIN' })));
+    return res.json(buildings.map((b) => ({ ...b, role: 'ADMIN', status: 'ACTIVE' })));
   }
   const memberships = await prisma.buildingAdmin.findMany({
     where: { userId: req.user.id },
     include: { building: true },
     orderBy: { building: { name: 'asc' } },
   });
-  res.json(memberships.map((m) => ({ ...m.building, role: m.role })));
+  res.json(memberships.map((m) => ({ ...m.building, role: m.role, status: m.status })));
 });
 
 // SUPER_ADMIN only: provision a new building and its admin account.

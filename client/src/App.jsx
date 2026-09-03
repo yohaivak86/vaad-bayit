@@ -7,10 +7,12 @@ import ApprovePaymentModal from './components/ApprovePaymentModal';
 import ManageAdminsModal from './components/ManageAdminsModal';
 import AuthScreen from './components/AuthScreen';
 import BuildingSelector from './components/BuildingSelector';
+import AnnouncementsBoard from './components/AnnouncementsBoard';
 import TenantsTab from './components/tabs/TenantsTab';
 import TasksTab from './components/tabs/TasksTab';
 import ExpensesTab from './components/tabs/ExpensesTab';
 import BudgetTab from './components/tabs/BudgetTab';
+import DocumentsTab from './components/tabs/DocumentsTab';
 import { api } from './api';
 
 export default function App() {
@@ -33,7 +35,7 @@ export default function App() {
   const loadBuildings = useCallback(async () => {
     const list = await api.getBuildings();
     setBuildings(list);
-    if (list.length === 1) setBuildingId(list[0].id);
+    if (list.length === 1 && list[0].status === 'ACTIVE') setBuildingId(list[0].id);
   }, []);
 
   useEffect(() => {
@@ -121,12 +123,14 @@ export default function App() {
         onLogout={logout}
         readOnly={readOnly}
       />
+      <AnnouncementsBoard buildingId={buildingId} readOnly={readOnly} />
       <TabBar active={tab} onChange={setTab} />
 
       {tab === 'tenants' && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={readOnly} />}
       {tab === 'tasks' && <TasksTab buildingId={buildingId} readOnly={readOnly} />}
       {tab === 'expenses' && <ExpensesTab buildingId={buildingId} building={building} readOnly={readOnly} />}
       {tab === 'budget' && <BudgetTab buildingId={buildingId} readOnly={readOnly} />}
+      {tab === 'documents' && <DocumentsTab buildingId={buildingId} readOnly={readOnly} />}
 
       {showSettings && (
         <OnboardingModal building={building} onClose={() => setShowSettings(false)} onSave={saveSettings} />

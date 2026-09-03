@@ -32,6 +32,7 @@ export const api = {
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
   getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
   addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
+  approveBuildingAdmin: (buildingId, userId, role) => request(`/buildings/${buildingId}/admins/${userId}/approve`, { method: 'POST', body: JSON.stringify({ role }) }),
   updateBuildingAdminRole: (buildingId, userId, role) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   removeBuildingAdmin: (buildingId, userId) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'DELETE' }),
   regenerateInviteCode: (buildingId) => request(`/buildings/${buildingId}/invite-code/regenerate`, { method: 'POST' }),
@@ -80,4 +81,20 @@ export const api = {
   updateBudgetItem: (buildingId, id, data) => request(`/buildings/${buildingId}/budget/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteBudgetItem: (buildingId, id) => request(`/buildings/${buildingId}/budget/${id}`, { method: 'DELETE' }),
   getProjection: (buildingId, year) => request(`/buildings/${buildingId}/budget/projection?year=${year}`),
+
+  // Meeting minutes
+  getMinutes: (buildingId) => request(`/buildings/${buildingId}/minutes`),
+  createMinutes: (buildingId, data) => request(`/buildings/${buildingId}/minutes`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteMinutes: (buildingId, id) => request(`/buildings/${buildingId}/minutes/${id}`, { method: 'DELETE' }),
+
+  // Procedures
+  getProcedures: (buildingId) => request(`/buildings/${buildingId}/procedures`),
+  createProcedure: (buildingId, data) => request(`/buildings/${buildingId}/procedures`, { method: 'POST', body: JSON.stringify(data) }),
+  updateProcedure: (buildingId, id, data) => request(`/buildings/${buildingId}/procedures/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProcedure: (buildingId, id) => request(`/buildings/${buildingId}/procedures/${id}`, { method: 'DELETE' }),
+
+  // Announcements
+  getAnnouncements: (buildingId) => request(`/buildings/${buildingId}/announcements`),
+  createAnnouncement: (buildingId, data) => request(`/buildings/${buildingId}/announcements`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteAnnouncement: (buildingId, id) => request(`/buildings/${buildingId}/announcements/${id}`, { method: 'DELETE' }),
 };

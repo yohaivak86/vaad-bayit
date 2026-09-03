@@ -1,10 +1,11 @@
-import { Users, ClipboardList, Receipt, LineChart } from 'lucide-react';
+import { Users, ClipboardList, Receipt, LineChart, FileText } from 'lucide-react';
 
 const TABS = [
   { key: 'tenants', label: 'דיירים וגבייה', icon: Users },
   { key: 'tasks', label: 'משימות ותקלות', icon: ClipboardList },
   { key: 'expenses', label: 'הוצאות ותנועות', icon: Receipt },
   { key: 'budget', label: 'תכנון שנתי', icon: LineChart },
+  { key: 'documents', label: 'מסמכים ונהלים', icon: FileText },
 ];
 
 export default function TabBar({ active, onChange }) {
