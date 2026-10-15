@@ -91,7 +91,7 @@ npm run seed --prefix server
 
 ### משתני סביבה
 רוב המשתנים מוגדרים אוטומטית על ידי `render.yaml`:
-- `DATABASE_URL` - מחובר אוטומטית למסד הנתונים שנוצר.
+- `DATABASE_URL` - כתובת החיבור ל-Supabase (Session pooler). מוגדר ידנית ב-Dashboard של Render (`sync: false`), ולא נוצר אוטומטית.
 - `PORT` - פורט ההאזנה של השרת.
 - `NODE_ENV=production`
 - `JWT_SECRET` - נוצר אוטומטית (`generateValue: true`) לחתימת הסשן.
