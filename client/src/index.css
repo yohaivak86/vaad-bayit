@@ -411,3 +411,8 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child { background: #fff; bo
   .segmented::-webkit-scrollbar { display: none; }
   .segmented button { white-space: nowrap; flex-shrink: 0; padding-inline: var(--space-3); }
 }
+
+/* The WHOLE sidebar scrolls (never a small inner scroller that hides menu items on a short screen). */
+.sidebar { overflow-y: auto; overscroll-behavior: contain; }
+.sidebar .nav-item { min-height: 42px; flex-shrink: 0; }
+@media (max-height: 820px) { .sidebar .nav-item { min-height: 38px; } }

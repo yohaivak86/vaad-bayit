@@ -33,7 +33,7 @@ export default function AppShell({
         </div>
       </div>
 
-      <nav className="stack flex-1 overflow-y-auto" style={{ gap: 2, padding: 'var(--space-2) var(--space-3)' }}>
+      <nav className="stack" style={{ gap: 2, padding: 'var(--space-2) var(--space-3)', flex: '0 0 auto' }}>
         {nav.map((item) => {
           const Icon = item.icon;
           return (
@@ -46,7 +46,7 @@ export default function AppShell({
         })}
       </nav>
 
-      <div className="hairline stack" style={{ gap: 2, padding: 'var(--space-3)' }}>
+      <div className="hairline stack" style={{ gap: 2, padding: 'var(--space-3)', marginTop: 'auto' }}>
         <ShareButton className="nav-item" iconSize={20} inviteCode={inviteCode} buildingName={building?.name} />
         <button onClick={run(onOpenProfessionals)} className="nav-item"><Wrench size={20} /> בעלי מקצוע</button>
         {isCommittee && (
