@@ -133,10 +133,10 @@ function Movements({ buildingId, building, onEdit, onChanged, initialPaidFrom })
           <p>דו"ח הוצאות: {filters.from} עד {filters.to}</p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="tile"><span className="stat-label">סה"כ בתקופה</span><span className="stat-value stat-value--md">{formatILS(summary?.total)}</span></div>
-          <div className="tile"><span className="stat-label">מזומן</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.CASH)}</span></div>
-          <div className="tile"><span className="stat-label">בנק</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.BANK)}</span></div>
-          <div className="tile"><span className="stat-label">PayBox</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.PAYBOX)}</span></div>
+          <div className="tile tile--rose"><span className="stat-label">סה"כ בתקופה</span><span className="stat-value stat-value--md">{formatILS(summary?.total)}</span></div>
+          <div className="tile tile--amber"><span className="stat-label">מזומן</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.CASH)}</span></div>
+          <div className="tile tile--blue"><span className="stat-label">בנק</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.BANK)}</span></div>
+          <div className="tile tile--purple"><span className="stat-label">PayBox</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.PAYBOX)}</span></div>
         </div>
 
         {summary && Object.keys(summary.byCategory).length > 0 && (
@@ -250,8 +250,8 @@ function Expected({ buildingId, onPay, onChanged }) {
 
       {items && items.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          <div className="tile"><span className="stat-label">חודשיות - סה"כ לחודש</span><span className="stat-value stat-value--md">{formatILS(monthlyTotal)}</span></div>
-          <div className="tile"><span className="stat-label">שנתיות - סה"כ לשנה</span><span className="stat-value stat-value--md">{formatILS(annualTotal)}</span></div>
+          <div className="tile tile--blue"><span className="stat-label">חודשיות - סה"כ לחודש</span><span className="stat-value stat-value--md">{formatILS(monthlyTotal)}</span></div>
+          <div className="tile tile--purple"><span className="stat-label">שנתיות - סה"כ לשנה</span><span className="stat-value stat-value--md">{formatILS(annualTotal)}</span></div>
         </div>
       )}
 

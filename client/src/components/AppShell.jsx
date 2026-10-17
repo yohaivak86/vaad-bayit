@@ -101,8 +101,8 @@ export default function AppShell({
 
             {isCommittee && (
               <div className="hidden items-center gap-2 md:flex">
-                <button onClick={onAddExpense} className="btn btn--secondary btn--small"><ReceiptText size={16} /> הוצאה</button>
-                <button onClick={onApprovePayment} className="btn btn--primary btn--small"><Plus size={16} /> תשלום דייר</button>
+                <button onClick={onAddExpense} className="btn btn--rose btn--small"><ReceiptText size={16} /> הוצאה</button>
+                <button onClick={onApprovePayment} className="btn btn--success btn--small"><Plus size={16} /> תשלום דייר</button>
               </div>
             )}
           </header>

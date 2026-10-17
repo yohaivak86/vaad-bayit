@@ -249,10 +249,10 @@ function Timeline({ buildingId, isCommittee, complexName, onNavigate, startYear,
         <div className="stack" style={{ gap: 'var(--space-4)' }}>
           {isCommittee && fm && (
             <div className="grid grid-cols-2 gap-3">
-              <button type="button" className="tile tile--click" onClick={() => onNavigate('expenses', { view: 'expected' })}>
+              <button type="button" className="tile tile--blue tile--click" onClick={() => onNavigate('expenses', { view: 'expected' })}>
                 <span className="stat-label">מתוכנן ב{MONTHS_HE[month - 1]}</span><span className="stat-value stat-value--md">{formatILS(fm.planned)}</span>
               </button>
-              <button type="button" className="tile tile--click" onClick={() => onNavigate('expenses', { view: 'movements' })}>
+              <button type="button" className="tile tile--emerald tile--click" onClick={() => onNavigate('expenses', { view: 'movements' })}>
                 <span className="stat-label">שולם בפועל</span><span className="stat-value stat-value--md">{formatILS(fm.actual)}</span>
               </button>
             </div>
@@ -289,10 +289,10 @@ function Timeline({ buildingId, isCommittee, complexName, onNavigate, startYear,
       {data && mode === 'year' && (
         <div className="stack" style={{ gap: 'var(--space-5)' }}>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi label="משימות פתוחות" value={open.length} onClick={() => onNavigate('tasks', { filter: 'OPEN' })} />
-            <Kpi label="דחופות" value={urgent.length} dot="danger" onClick={() => onNavigate('tasks', { filter: 'URGENT' })} />
-            <Kpi label="הושלמו השנה" value={resolved.length} dot="success" onClick={() => onNavigate('tasks', { filter: 'RESOLVED' })} />
-            <Kpi label="פריטים בציר" value={items.length} onClick={() => onNavigate('tasks', { filter: 'ALL' })} />
+            <Kpi tone="rose" label="משימות פתוחות" value={open.length} onClick={() => onNavigate('tasks', { filter: 'OPEN' })} />
+            <Kpi tone="amber" label="דחופות" value={urgent.length} onClick={() => onNavigate('tasks', { filter: 'URGENT' })} />
+            <Kpi tone="emerald" label="הושלמו השנה" value={resolved.length} onClick={() => onNavigate('tasks', { filter: 'RESOLVED' })} />
+            <Kpi tone="blue" label="פריטים בציר" value={items.length} onClick={() => onNavigate('tasks', { filter: 'ALL' })} />
           </div>
 
           <div className="overflow-x-auto" style={{ paddingBottom: 'var(--space-3)' }}>
@@ -337,8 +337,8 @@ function Forecast({ forecast, currentMonth, onPickMonth, onOpenPlan }) {
         <button className="btn btn--secondary btn--small" onClick={onOpenPlan}>עריכת ההוצאות הצפויות</button>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div className="tile"><span className="stat-label">מתוכנן לשנה</span><span className="stat-value stat-value--md">{formatILS(forecast.plannedTotal)}</span></div>
-        <div className="tile"><span className="stat-label">שולם עד עכשיו</span><span className="stat-value stat-value--md">{formatILS(forecast.actualTotal)}</span></div>
+        <div className="tile tile--blue"><span className="stat-label">מתוכנן לשנה</span><span className="stat-value stat-value--md">{formatILS(forecast.plannedTotal)}</span></div>
+        <div className="tile tile--emerald"><span className="stat-label">שולם עד עכשיו</span><span className="stat-value stat-value--md">{formatILS(forecast.actualTotal)}</span></div>
       </div>
       <div className="table-wrap">
         <table className="table">
@@ -367,9 +367,9 @@ function Forecast({ forecast, currentMonth, onPickMonth, onOpenPlan }) {
   );
 }
 
-function Kpi({ label, value, dot, onClick }) {
+function Kpi({ label, value, dot, tone = 'blue', onClick }) {
   return (
-    <button type="button" className="tile tile--click" onClick={onClick}>
+    <button type="button" className={`tile tile--${tone} tile--click`} onClick={onClick}>
       <span className="stat-label row">{dot && <span className={`dot dot--${dot}`} />}{label}</span>
       <span className="stat-value">{value}</span>
     </button>
@@ -382,7 +382,7 @@ function EventCard({ item, onClick }) {
   const d = new Date(item.date);
 
   return (
-    <button type="button" onClick={onClick} className="card card--tight tile--click" style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--bg-grouped)', textAlign: 'start', width: '100%' }}>
+    <button type="button" onClick={onClick} className="card card--tight tile--click" style={{ padding: 'var(--space-2) var(--space-3)', background: '#fff', textAlign: 'start', width: '100%', borderInlineStart: `5px solid ${isTask ? { danger: '#f43f5e', warning: '#f59e0b', success: '#10b981' }[st.dot] : '#94a3b8'}` }}>
       <div className="row" style={{ alignItems: 'flex-start', gap: 'var(--space-2)' }}>
         {isTask ? <span className={`dot dot--${st.dot}`} style={{ marginTop: 6 }} /> : <Receipt size={14} style={{ marginTop: 3 }} color="var(--label-secondary)" />}
         <div style={{ minWidth: 0, flex: 1 }}>

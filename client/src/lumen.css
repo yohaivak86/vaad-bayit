@@ -10,18 +10,18 @@
 
   /* ---------- Colors (light) ---------- */
   --bg: #ffffff;               /* page background */
-  --bg-grouped: #f2f2f7;       /* background behind cards / grouped lists */
+  --bg-grouped: #f3f6fb;       /* background behind cards / grouped lists */
   --surface: #ffffff;          /* cards sitting on bg-grouped */
-  --label: #1d1d1f;            /* primary text */
-  --label-secondary: #6e6e73;  /* secondary text, metadata */
-  --separator: #d2d2d7;        /* hairlines, disabled fills */
-  --accent: #0071e3;           /* the ONLY interactive color */
-  --accent-hover: #0077ed;
+  --label: #0f172a;            /* primary text */
+  --label-secondary: #64748b;  /* secondary text, metadata */
+  --separator: #e2e8f0;        /* hairlines, disabled fills */
+  --accent: #2563eb;           /* primary brand blue */
+  --accent-hover: #1d4ed8;
   --on-accent: #ffffff;
-  --success: #34c759;          /* fills/dots only, not text on white */
-  --warning: #ff9500;
-  --danger: #ff3b30;
-  --fill-quiet: rgba(118, 118, 128, 0.12); /* secondary buttons, inputs */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #e11d48;
+  --fill-quiet: rgba(100, 116, 139, 0.12); /* quiet fills */
 
   /* Project additions (tokens first, per DESIGN.md): tints derive from the colors above, so they
      follow the dark theme automatically. */
@@ -31,11 +31,21 @@
   --danger-tint: color-mix(in srgb, var(--danger) 12%, transparent);
   --overlay: rgba(0, 0, 0, 0.4);   /* modal backdrop */
   --sidebar-width: 280px;
+
+  /* Colourful theme: the gradients behind the tiles, buttons, sidebar and login hero. */
+  --grad-blue: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  --grad-purple: linear-gradient(135deg, #8b5cf6, #6d28d9);
+  --grad-amber: linear-gradient(135deg, #fbbf24, #f97316);
+  --grad-emerald: linear-gradient(135deg, #10b981, #0f766e);
+  --grad-rose: linear-gradient(135deg, #fb7185, #be123c);
+  --grad-navy: linear-gradient(180deg, #0b1b3a 0%, #0f2a55 55%, #0b1f44 100%);
+  --edge-3d: 0 3px 0 rgba(0, 0, 0, 0.22), 0 10px 18px -8px rgba(15, 23, 42, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --page-wash: radial-gradient(1200px 500px at 85% -10%, rgba(37, 99, 235, 0.09), transparent 60%), radial-gradient(900px 480px at -10% 10%, rgba(16, 185, 129, 0.07), transparent 55%);
   --space-5: 20px;
   --space-7: 32px;
 
   /* ---------- Typography ---------- */
-  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", "Rubik", system-ui, sans-serif;
+  --font-sans: "Assistant", "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --text-display: 700 56px/60px var(--font-sans);
   --text-large-title: 700 34px/41px var(--font-sans);
@@ -54,13 +64,13 @@
   --space-8: 48px;
 
   /* ---------- Radius ---------- */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
+  --radius-sm: 12px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
   --radius-pill: 999px;
 
   /* ---------- Shadow & motion ---------- */
-  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-card: 0 12px 30px -14px rgba(15, 23, 42, 0.28), 0 2px 6px -2px rgba(15, 23, 42, 0.08);
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
   --duration: 200ms;
 }

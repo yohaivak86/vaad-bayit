@@ -1,5 +1,7 @@
 # Design system: Lumen
 
+> **Project override:** this app uses Lumen's structure (class names, tokens, components) but a deliberately COLOURFUL, light-only theme: gradient tiles, 3D buttons, a navy sidebar. The theme lives at the end of `client/src/index.css`, and its colours/gradients are tokens in `client/src/lumen.css`. Where the rules below ("no gradients", "one interactive colour", automatic dark mode) conflict with that, the colourful theme wins.
+
 All UI in this project uses the Lumen design system defined in `lumen.css`. Follow these rules for every screen, component and page you build or change.
 
 ## Setup
