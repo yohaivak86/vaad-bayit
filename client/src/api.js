@@ -57,15 +57,30 @@ export const api = {
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   joinBuilding: (data) => request('/auth/join-building', { method: 'POST', body: JSON.stringify(data) }),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  signup: (data) => request('/auth/signup', { method: 'POST', body: JSON.stringify(data) }),
+  forgotPassword: (email) => request('/auth/forgot', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token, password) => request('/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   // Buildings (multi-tenant)
   getBuildings: () => request('/buildings'),
   createBuilding: (data) => request('/buildings', { method: 'POST', body: JSON.stringify(data) }),
+  searchBuildings: (q) => request(`/buildings/search?q=${encodeURIComponent(q)}`),
+  requestJoinBuilding: (data) => request('/buildings/join-request', { method: 'POST', body: JSON.stringify(data) }),
+  openNewBuilding: (data) => request('/buildings/new', { method: 'POST', body: JSON.stringify(data) }),
 
   // Building settings
   getBuilding: (buildingId) => request(`/buildings/${buildingId}`),
   updateBuilding: (buildingId, data) => request(`/buildings/${buildingId}`, { method: 'PUT', body: JSON.stringify(data) }),
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
+  setRedLine: (buildingId, treasuryRedLine) => request(`/buildings/${buildingId}/red-line`, { method: 'PUT', body: JSON.stringify({ treasuryRedLine }) }),
+  getUpcoming: (buildingId, offset = 1) => request(`/buildings/${buildingId}/upcoming?offset=${offset}`),
+  getRecurring: (buildingId) => request(`/buildings/${buildingId}/recurring`),
+  createRecurring: (buildingId, data) => request(`/buildings/${buildingId}/recurring`, { method: 'POST', body: JSON.stringify(data) }),
+  bulkRecurring: (buildingId, items) => request(`/buildings/${buildingId}/recurring/bulk`, { method: 'POST', body: JSON.stringify({ items }) }),
+  updateRecurring: (buildingId, id, data) => request(`/buildings/${buildingId}/recurring/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteRecurring: (buildingId, id) => request(`/buildings/${buildingId}/recurring/${id}`, { method: 'DELETE' }),
+  getBuildingComplexRequests: (buildingId) => request(`/buildings/${buildingId}/complex/requests`),
+  cancelBuildingComplexRequest: (buildingId, id) => request(`/buildings/${buildingId}/complex/requests/${id}`, { method: 'DELETE' }),
   getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
   addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
   approveBuildingAdmin: (buildingId, userId, role, tenantId) => request(`/buildings/${buildingId}/admins/${userId}/approve`, { method: 'POST', body: JSON.stringify({ role, tenantId }) }),
@@ -92,6 +107,10 @@ export const api = {
 
   // Complexes (multiple buildings sharing costs)
   getMyComplexes: () => request('/complexes/mine'),
+  searchComplexes: (q) => request(`/complexes/search?q=${encodeURIComponent(q)}`),
+  requestJoinComplex: (complexId, buildingId) => request(`/complexes/${complexId}/join-requests`, { method: 'POST', body: JSON.stringify({ buildingId }) }),
+  getIncomingComplexRequests: () => request('/complexes/requests/incoming'),
+  decideComplexRequest: (requestId, decision) => request(`/complexes/requests/${requestId}/${decision}`, { method: 'POST' }),
   getComplex: (id) => request(`/complexes/${id}`),
   createComplex: (data) => request('/complexes', { method: 'POST', body: JSON.stringify(data) }),
   joinComplex: (data) => request('/complexes/join', { method: 'POST', body: JSON.stringify(data) }),

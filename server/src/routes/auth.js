@@ -1,5 +1,7 @@
+const crypto = require('crypto');
 const express = require('express');
 const prisma = require('../lib/prisma');
+const { sendEmail } = require('../lib/email');
 const { hashPassword, verifyPassword, signToken, setSessionCookie, clearSessionCookie } = require('../lib/auth');
 const { requireAuth } = require('../middleware/auth');
 const { generateInviteCode } = require('../lib/inviteCode');
@@ -85,6 +87,69 @@ router.post('/join-building', async (req, res) => {
   const token = signToken(user);
   setSessionCookie(res, token);
   res.status(201).json({ user: publicUser(user), buildingId: building.id, buildingName: building.name, pending: true });
+});
+
+// Step one of the new-user flow: just the account. What the user does next - join an existing
+// building (by invite code or search) or open a new one - happens signed in, via /api/buildings.
+router.post('/signup', async (req, res) => {
+  const { email, password, name, phone, marketingConsent } = req.body;
+  let user;
+  try {
+    user = await prisma.$transaction((tx) => createUserAccount(tx, { email, password, name, phone, marketingConsent }));
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+  setSessionCookie(res, signToken(user));
+  res.status(201).json({ user: publicUser(user) });
+});
+
+const RESET_TTL_MS = 60 * 60 * 1000;
+const sha256 = (value) => crypto.createHash('sha256').update(value).digest('hex');
+
+// Always answers the same way, so the form can't be used to find out which e-mails are registered.
+router.post('/forgot', async (req, res) => {
+  const email = String(req.body.email || '').toLowerCase().trim();
+  const reply = { ok: true };
+  if (!email) return res.status(400).json({ error: 'יש להזין כתובת אימייל' });
+
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return res.json(reply);
+
+  const token = crypto.randomBytes(32).toString('hex');
+  await prisma.passwordReset.create({ data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) } });
+
+  const base = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const link = `${base}/?reset=${token}`;
+  await sendEmail({
+    to: user.email,
+    subject: 'איפוס סיסמה - ועד בית',
+    text: `שלום ${user.name},\n\nהתקבלה בקשה לאיפוס הסיסמה שלך. הקישור תקף לשעה:\n${link}\n\nאם לא ביקשת איפוס - אפשר להתעלם מההודעה.`,
+  });
+
+  // Test hook only: lets the automated tests finish the flow without a mailbox.
+  if (process.env.EXPOSE_RESET_TOKEN === '1') reply.devToken = token;
+  res.json(reply);
+});
+
+router.post('/reset', async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ error: 'token ו-password הם שדות חובה' });
+  if (password.length < 8) return res.status(400).json({ error: 'הסיסמה חייבת להכיל לפחות 8 תווים' });
+
+  const reset = await prisma.passwordReset.findUnique({ where: { tokenHash: sha256(String(token)) }, include: { user: true } });
+  if (!reset || reset.usedAt || reset.expiresAt < new Date()) {
+    return res.status(400).json({ error: 'הקישור לא תקף או שפג תוקפו - בקשו איפוס חדש' });
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash: await hashPassword(password) } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+    // Any other outstanding link for this user dies with this one.
+    prisma.passwordReset.updateMany({ where: { userId: reset.userId, usedAt: null }, data: { usedAt: new Date() } }),
+  ]);
+  setSessionCookie(res, signToken(reset.user));
+  res.json({ user: publicUser(reset.user) });
 });
 
 router.post('/login', async (req, res) => {

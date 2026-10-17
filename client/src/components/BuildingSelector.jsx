@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Building2, ChevronLeft, LogOut, Plus, X, Users2, Clock, Settings2, Lightbulb, ShieldCheck } from 'lucide-react';
+import { Building2, ChevronLeft, LogOut, Plus, Users2, Clock, Settings2, Lightbulb, ShieldCheck, DoorOpen } from 'lucide-react';
 import { api } from '../api';
 import ComplexesModal from './ComplexesModal';
 import SiteSettingsModal from './SiteSettingsModal';
 import SuggestionsAdminModal from './SuggestionsAdminModal';
 import AdminControlCenterModal from './AdminControlCenterModal';
+import JoinOrCreate from './JoinOrCreate';
+import Sheet from './Sheet';
 
 export default function BuildingSelector({ user, buildings, onSelect, onLogout, onBuildingsChanged }) {
   const [showCreate, setShowCreate] = useState(false);
@@ -12,94 +14,78 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
   const [showSiteSettings, setShowSiteSettings] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showControlCenter, setShowControlCenter] = useState(false);
+  const [showJoin, setShowJoin] = useState(false);
+
+  if (showJoin) {
+    return (
+      <JoinOrCreate
+        onLogout={onLogout}
+        onCancel={() => setShowJoin(false)}
+        onDone={async (buildingId) => {
+          setShowJoin(false);
+          await onBuildingsChanged();
+          if (buildingId) onSelect(buildingId);
+        }}
+      />
+    );
+  }
+
+  const isSiteAdmin = user.role === 'SUPER_ADMIN';
 
   return (
-    <div dir="rtl" className="min-h-screen bg-slate-50 px-4 py-8">
-      <div className="max-w-md mx-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h1 className="font-extrabold text-lg text-slate-800">שלום, {user.name}</h1>
-            <p className="text-xs text-slate-500">בחרו בניין לניהול</p>
-          </div>
-          <button onClick={onLogout} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700" title="התנתקות">
-            <LogOut size={18} />
-          </button>
+    <div dir="rtl" style={{ minHeight: '100vh' }}>
+      <header className="navbar">
+        <div>
+          <h3 style={{ margin: 0 }}>שלום, {user.name}</h3>
+          <p className="text-footnote text-secondary" style={{ margin: 0 }}>בחרו בניין לניהול</p>
         </div>
+        <button onClick={onLogout} className="icon-btn" title="התנתקות" aria-label="התנתקות"><LogOut size={20} /></button>
+      </header>
 
-        <div className="space-y-2">
+      <div className="page stack" style={{ maxWidth: 560 }}>
+        <ul className="list">
           {buildings.map((b) => {
             const isPending = b.status === 'PENDING';
             return (
-              <button
-                key={b.id}
-                onClick={() => !isPending && onSelect(b.id)}
-                disabled={isPending}
-                className={`w-full flex items-center justify-between rounded-2xl px-4 py-3.5 ${
-                  isPending ? 'border border-amber-200 bg-amber-50 cursor-default' : 'card card-lift'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`rounded-lg p-2 ${isPending ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
-                    <Building2 size={18} />
+              <li key={b.id} className={isPending ? '' : 'is-link'} onClick={() => !isPending && onSelect(b.id)} style={{ minHeight: 64 }}>
+                <div className="row" style={{ gap: 'var(--space-3)', minWidth: 0 }}>
+                  <div className={`chip ${isPending ? '' : 'chip--accent'}`} style={{ width: 40, height: 40, padding: 0, justifyContent: 'center' }}>
+                    <Building2 size={20} />
                   </div>
-                  <div className="text-start">
-                    <p className="font-semibold text-slate-800 text-sm">{b.name}</p>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: 0 }} className="truncate">{b.name}</h3>
                     {isPending ? (
-                      <p className="text-xs text-amber-700 flex items-center gap-1"><Clock size={11} /> ממתין לאישור מנהל הבניין</p>
+                      <p className="text-footnote text-secondary row" style={{ margin: 0 }}><Clock size={14} /> ממתין לאישור נציג ועד</p>
                     ) : (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-footnote text-secondary truncate" style={{ margin: 0 }}>
                         {b.address}
-                        {b.complexName ? <span className="font-semibold text-violet-600">{b.address ? ' · ' : ''}מתחם {b.complexName}</span> : ''}
+                        {b.complexName ? `${b.address ? ' · ' : ''}מתחם ${b.complexNumber ?? ''} ${b.complexName}` : ''}
                       </p>
                     )}
                   </div>
                 </div>
-                {!isPending && <ChevronLeft size={18} className="text-slate-300" />}
-              </button>
+                {isPending ? <span className="badge badge--warning">ממתין</span> : <ChevronLeft size={20} color="var(--label-secondary)" />}
+              </li>
             );
           })}
-          {buildings.length === 0 && (
-            <p className="text-sm text-slate-400 text-center py-6">אין עדיין בניינים משויכים לחשבון</p>
+          {buildings.length === 0 && <li><span className="text-secondary text-footnote">אין עדיין בניינים משויכים לחשבון</span></li>}
+        </ul>
+
+        <button onClick={() => setShowJoin(true)} className="btn btn--primary"><DoorOpen size={20} /> הצטרפות לבניין או פתיחת בניין חדש</button>
+
+        <ul className="list">
+          {buildings.length > 0 && (
+            <li className="is-link" onClick={() => setShowComplexes(true)}><span className="row"><Users2 size={20} /> מתחמים (בניינים משותפים)</span><ChevronLeft size={20} color="var(--label-secondary)" /></li>
           )}
-        </div>
-
-        {user.role === 'SUPER_ADMIN' && (
-          <>
-            <button
-              onClick={() => setShowCreate(true)}
-              className="w-full flex items-center justify-center gap-1.5 mt-3 border border-dashed border-slate-300 text-slate-500 rounded-xl py-3 text-sm font-medium hover:bg-white transition"
-            >
-              <Plus size={16} /> הוספת בניין חדש
-            </button>
-            <button
-              onClick={() => setShowControlCenter(true)}
-              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
-            >
-              <ShieldCheck size={16} /> מרכז ניהול (כל הבניינים והמשתמשים)
-            </button>
-            <button
-              onClick={() => setShowSiteSettings(true)}
-              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
-            >
-              <Settings2 size={16} /> הגדרות מערכת
-            </button>
-            <button
-              onClick={() => setShowSuggestions(true)}
-              className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
-            >
-              <Lightbulb size={16} /> הצעות לשיפור
-            </button>
-          </>
-        )}
-
-        {buildings.length > 0 && (
-          <button
-            onClick={() => setShowComplexes(true)}
-            className="w-full flex items-center justify-center gap-1.5 mt-2 text-slate-500 rounded-xl py-2.5 text-sm font-medium hover:bg-white transition"
-          >
-            <Users2 size={16} /> מתחמים (בניינים משותפים)
-          </button>
-        )}
+          {isSiteAdmin && (
+            <>
+              <li className="is-link" onClick={() => setShowCreate(true)}><span className="row"><Plus size={20} /> הוספת בניין (מנהל אתר)</span><ChevronLeft size={20} color="var(--label-secondary)" /></li>
+              <li className="is-link" onClick={() => setShowControlCenter(true)}><span className="row"><ShieldCheck size={20} /> מרכז ניהול (כל הבניינים והמשתמשים)</span><ChevronLeft size={20} color="var(--label-secondary)" /></li>
+              <li className="is-link" onClick={() => setShowSiteSettings(true)}><span className="row"><Settings2 size={20} /> הגדרות מערכת</span><ChevronLeft size={20} color="var(--label-secondary)" /></li>
+              <li className="is-link" onClick={() => setShowSuggestions(true)}><span className="row"><Lightbulb size={20} /> הצעות לשיפור</span><ChevronLeft size={20} color="var(--label-secondary)" /></li>
+            </>
+          )}
+        </ul>
       </div>
 
       {showCreate && (
@@ -108,18 +94,10 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
           onCreated={async () => { setShowCreate(false); await onBuildingsChanged(); }}
         />
       )}
-      {showComplexes && (
-        <ComplexesModal myBuildings={buildings} onClose={() => setShowComplexes(false)} />
-      )}
-      {showSiteSettings && (
-        <SiteSettingsModal onClose={() => setShowSiteSettings(false)} />
-      )}
-      {showSuggestions && (
-        <SuggestionsAdminModal onClose={() => setShowSuggestions(false)} />
-      )}
-      {showControlCenter && (
-        <AdminControlCenterModal currentUserId={user.id} onClose={() => setShowControlCenter(false)} />
-      )}
+      {showComplexes && <ComplexesModal myBuildings={buildings} onClose={() => setShowComplexes(false)} />}
+      {showSiteSettings && <SiteSettingsModal onClose={() => setShowSiteSettings(false)} />}
+      {showSuggestions && <SuggestionsAdminModal onClose={() => setShowSuggestions(false)} />}
+      {showControlCenter && <AdminControlCenterModal currentUserId={user.id} onClose={() => setShowControlCenter(false)} />}
     </div>
   );
 }
@@ -145,47 +123,21 @@ function CreateBuildingModal({ onClose, onCreated }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800">בניין חדש</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
+    <Sheet title="בניין חדש" onClose={onClose}>
+      <form onSubmit={submit} className="stack">
+        <div className="field"><label>שם הבניין</label><input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required /></div>
+        <div className="field"><label>כתובת</label><input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" /></div>
+        <div className="field">
+          <label>קוד הזמנה למתחם (אם הבניין חלק ממתחם - לא חובה)</label>
+          <input value={form.complexInviteCode} onChange={(e) => set('complexInviteCode', e.target.value.toUpperCase())} className="input" dir="ltr" style={{ textAlign: 'center', letterSpacing: '0.12em' }} placeholder="ריק = בניין בודד" />
         </div>
-        <form onSubmit={submit} className="overflow-y-auto px-5 py-4 space-y-3 flex-1">
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">שם הבניין</label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">כתובת</label>
-            <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">קוד הזמנה למתחם (אם הבניין חלק ממתחם - אופציונלי)</label>
-            <input value={form.complexInviteCode} onChange={(e) => set('complexInviteCode', e.target.value.toUpperCase())} className="input font-mono tracking-widest text-center" placeholder="ריק = בניין בודד" />
-          </div>
-          <p className="text-xs text-slate-500 pt-1">פרטי חשבון נציג הוועד של הבניין:</p>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">שם מלא</label>
-            <input value={form.adminName} onChange={(e) => set('adminName', e.target.value)} className="input" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">אימייל</label>
-            <input type="email" value={form.adminEmail} onChange={(e) => set('adminEmail', e.target.value)} className="input" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">סיסמה זמנית</label>
-            <input type="password" value={form.adminPassword} onChange={(e) => set('adminPassword', e.target.value)} className="input" required minLength={8} />
-          </div>
-          {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-          <div className="pt-2 flex gap-2">
-            <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
-              {saving ? 'יוצר...' : 'יצירת בניין'}
-            </button>
-            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">ביטול</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <p className="text-footnote text-secondary" style={{ margin: 0 }}>פרטי חשבון נציג הוועד של הבניין:</p>
+        <div className="field"><label>שם מלא</label><input value={form.adminName} onChange={(e) => set('adminName', e.target.value)} className="input" required /></div>
+        <div className="field"><label>אימייל</label><input type="email" value={form.adminEmail} onChange={(e) => set('adminEmail', e.target.value)} className="input" required dir="ltr" style={{ textAlign: 'start' }} /></div>
+        <div className="field"><label>סיסמה זמנית (לפחות 8 תווים)</label><input type="password" value={form.adminPassword} onChange={(e) => set('adminPassword', e.target.value)} className="input" required minLength={8} /></div>
+        {error && <div className="alert alert--danger">{error}</div>}
+        <button type="submit" disabled={saving} className="btn btn--primary">{saving ? 'יוצר...' : 'יצירת בניין'}</button>
+      </form>
+    </Sheet>
   );
 }

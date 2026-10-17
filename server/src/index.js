@@ -26,6 +26,8 @@ const professionalsRoutes = require('./routes/professionals');
 const settingsRoutes = require('./routes/settings');
 const suggestionsRoutes = require('./routes/suggestions');
 const adminRoutes = require('./routes/admin');
+const recurringRoutes = require('./routes/recurring');
+const upcomingRoutes = require('./routes/upcoming');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -56,11 +58,13 @@ buildingScope.use('/profile', profileRoutes);
 buildingScope.use('/providers', providersRoutes);
 buildingScope.use('/tasks', tasksRoutes);
 buildingScope.use('/announcements', announcementsRoutes);
+buildingScope.use('/upcoming', upcomingRoutes);
 // Everything about other residents or money: committee reps (and the site admin) only.
 buildingScope.use('/tenants', requireCommittee, tenantsRoutes);
 buildingScope.use('/dues', requireCommittee, duesRoutes);
 buildingScope.use('/expenses', requireCommittee, expensesRoutes);
 buildingScope.use('/budget', requireCommittee, budgetRoutes);
+buildingScope.use('/recurring', requireCommittee, recurringRoutes);
 buildingScope.use('/minutes', requireCommittee, minutesRoutes);
 buildingScope.use('/procedures', requireCommittee, proceduresRoutes);
 

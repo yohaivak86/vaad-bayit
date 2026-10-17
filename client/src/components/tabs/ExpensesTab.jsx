@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Trash2, Printer, Filter, Paperclip, X, Upload } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Trash2, Printer, Paperclip, Upload, Pencil, Plus, FileSpreadsheet, ClipboardPlus, Wallet, Link2, Network, Repeat } from 'lucide-react';
 import { api } from '../../api';
 import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../../constants';
 import { formatILS, formatDateHe } from '../../format';
+import { createExpenseFromForm, updateExpenseFromForm } from '../../lib/expenseSave';
+import AddExpenseModal from '../AddExpenseModal';
+import RecurringItemSheet, { describeSchedule, nextOccurrence, FREQUENCY_LABELS } from '../RecurringItemSheet';
+import ExcelImportSheet from '../ExcelImportSheet';
+import Sheet from '../Sheet';
 
 function firstOfMonth() {
   const d = new Date();
@@ -12,60 +17,111 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function ExpensesTab({ buildingId, building, readOnly }) {
+// Two views of the money, one primary action:
+//   "תנועות"          - what was actually paid (edit / delete / receipt, any time)
+//   "הוצאות צפויות"   - what is planned: monthly, annual and one-time items, loaded by hand or from Excel
+export default function ExpensesTab({ buildingId, building, onBalanceChanged }) {
+  const [view, setView] = useState('movements'); // movements | expected
+  const [expenseSheet, setExpenseSheet] = useState(null); // { expense?, prefill? } | null
+  const [loadVersion, setLoadVersion] = useState(0);
+
+  const changed = useCallback(async () => {
+    setLoadVersion((v) => v + 1);
+    await onBalanceChanged?.();
+  }, [onBalanceChanged]);
+
+  const save = async (form, file) => {
+    if (expenseSheet?.expense) await updateExpenseFromForm(buildingId, expenseSheet.expense.id, form, file);
+    else await createExpenseFromForm(buildingId, form, file);
+    setExpenseSheet(null);
+    await changed();
+  };
+
+  return (
+    <div className="page stack" style={{ gap: 'var(--space-4)' }}>
+      <div className="row no-print" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+        <div>
+          <h1 className="page-title" style={{ margin: 0 }}>הוצאות</h1>
+          <p className="page-sub" style={{ margin: 0 }}>מה שולם, ומה צפוי בחודשים הקרובים</p>
+        </div>
+        <button className="btn btn--primary" onClick={() => setExpenseSheet({})}><Plus size={20} /> הוצאה חדשה</button>
+      </div>
+
+      <div className="segmented no-print" style={{ alignSelf: 'flex-start' }}>
+        <button aria-pressed={view === 'movements'} onClick={() => setView('movements')}>תנועות</button>
+        <button aria-pressed={view === 'expected'} onClick={() => setView('expected')}>הוצאות צפויות</button>
+      </div>
+
+      {view === 'movements' ? (
+        <Movements
+          key={`m-${loadVersion}`}
+          buildingId={buildingId}
+          building={building}
+          onEdit={(expense) => setExpenseSheet({ expense })}
+          onChanged={changed}
+        />
+      ) : (
+        <Expected
+          key={`e-${loadVersion}`}
+          buildingId={buildingId}
+          onPay={(item) => setExpenseSheet({ prefill: item })}
+          onChanged={changed}
+        />
+      )}
+
+      {expenseSheet && (
+        <AddExpenseModal
+          expense={expenseSheet.expense}
+          prefill={expenseSheet.prefill}
+          onClose={() => setExpenseSheet(null)}
+          onSave={save}
+        />
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------------------ movements
+function Movements({ buildingId, building, onEdit, onChanged }) {
   const [filters, setFilters] = useState({ from: firstOfMonth(), to: today(), category: '', paidFrom: '' });
   const [expenses, setExpenses] = useState(null);
   const [summary, setSummary] = useState(null);
   const [receiptExpense, setReceiptExpense] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v));
     const [exp, sum] = await Promise.all([api.getExpenses(buildingId, params), api.getExpensesSummary(buildingId, params)]);
     setExpenses(exp);
     setSummary(sum);
-  };
+  }, [buildingId, filters]);
 
-  useEffect(() => { load(); }, [filters, buildingId]);
+  useEffect(() => { load(); }, [load]);
 
-  const remove = async (id) => {
-    await api.deleteExpense(buildingId, id);
-    await load();
+  const remove = async (expense) => {
+    await api.deleteExpense(buildingId, expense.id);
+    setConfirmDelete(null);
+    await onChanged();
   };
 
   const maxCategory = summary ? Math.max(1, ...Object.values(summary.byCategory)) : 1;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-4 pb-24 sm:pb-6">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2 no-print">
-        <h2 className="font-bold text-slate-800">הוצאות ותנועות</h2>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-1 border border-slate-300 text-slate-600 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-slate-50 transition"
-        >
-          <Printer size={16} /> ייצוא דו"ח חודשי
-        </button>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4 no-print">
-        <p className="text-xs font-semibold text-slate-500 flex items-center gap-1 mb-2"><Filter size={13} /> סינון</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div>
-            <label className="block text-[11px] text-slate-500 mb-1">מתאריך</label>
-            <input type="date" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))} className="input" />
-          </div>
-          <div>
-            <label className="block text-[11px] text-slate-500 mb-1">עד תאריך</label>
-            <input type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} className="input" />
-          </div>
-          <div>
-            <label className="block text-[11px] text-slate-500 mb-1">קטגוריה</label>
+    <>
+      <div className="card card--tight no-print">
+        <div className="field-row" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+          <div className="field"><label>מתאריך</label><input type="date" value={filters.from} onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value }))} className="input" /></div>
+          <div className="field"><label>עד תאריך</label><input type="date" value={filters.to} onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))} className="input" /></div>
+          <div className="field">
+            <label>קטגוריה</label>
             <select value={filters.category} onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))} className="input">
               <option value="">הכל</option>
               {EXPENSE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="תחזוקה ותיקונים">תחזוקה ותיקונים</option>
             </select>
           </div>
-          <div>
-            <label className="block text-[11px] text-slate-500 mb-1">מקור תשלום</label>
+          <div className="field">
+            <label>מקור תשלום</label>
             <select value={filters.paidFrom} onChange={(e) => setFilters((f) => ({ ...f, paidFrom: e.target.value }))} className="input">
               <option value="">הכל</option>
               {PAID_FROM_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
@@ -74,96 +130,192 @@ export default function ExpensesTab({ buildingId, building, readOnly }) {
         </div>
       </div>
 
-      <div className="print-area bg-white rounded-xl border border-slate-200 p-4 mb-4">
-        <div className="hidden print:block mb-3">
-          <h1 className="font-extrabold text-lg">{building?.name}</h1>
-          <p className="text-sm text-slate-500">דו"ח הוצאות: {filters.from} עד {filters.to}</p>
+      <div className="print-area stack" style={{ gap: 'var(--space-3)' }}>
+        <div className="hidden print:block">
+          <h1 style={{ fontSize: 20 }}>{building?.name}</h1>
+          <p>דו"ח הוצאות: {filters.from} עד {filters.to}</p>
         </div>
-        <p className="text-xs font-semibold text-slate-500 mb-2">סיכום לתקופה שנבחרה</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-          <SummaryBox label='סה"כ הוצאות' value={formatILS(summary?.total)} />
-          <SummaryBox label="מזומן" value={formatILS(summary?.byPaidFrom?.CASH)} />
-          <SummaryBox label="בנק" value={formatILS(summary?.byPaidFrom?.BANK)} />
-          <SummaryBox label="PayBox" value={formatILS(summary?.byPaidFrom?.PAYBOX)} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="tile"><span className="stat-label">סה"כ בתקופה</span><span className="stat-value stat-value--md">{formatILS(summary?.total)}</span></div>
+          <div className="tile"><span className="stat-label">מזומן</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.CASH)}</span></div>
+          <div className="tile"><span className="stat-label">בנק</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.BANK)}</span></div>
+          <div className="tile"><span className="stat-label">PayBox</span><span className="stat-value stat-value--md">{formatILS(summary?.byPaidFrom?.PAYBOX)}</span></div>
         </div>
+
         {summary && Object.keys(summary.byCategory).length > 0 && (
-          <div className="space-y-1.5 mb-1">
-            {Object.entries(summary.byCategory)
-              .sort((a, b) => b[1] - a[1])
-              .map(([cat, amt]) => (
-                <div key={cat} className="flex items-center gap-2">
-                  <span className="text-xs w-24 shrink-0 text-slate-600 truncate">{cat}</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-3.5 overflow-hidden">
-                    <div className="bg-blue-500 h-full rounded-full" style={{ width: `${(amt / maxCategory) * 100}%` }} />
-                  </div>
-                  <span className="text-xs w-16 text-left text-slate-700 font-medium">{formatILS(amt)}</span>
+          <div className="card card--tight stack" style={{ gap: 'var(--space-2)' }}>
+            {Object.entries(summary.byCategory).sort((a, b) => b[1] - a[1]).map(([cat, amt]) => (
+              <div key={cat} className="row">
+                <span className="text-footnote truncate" style={{ width: 110, flexShrink: 0 }}>{cat}</span>
+                <div style={{ flex: 1, background: 'var(--fill-quiet)', borderRadius: 'var(--radius-pill)', height: 10, overflow: 'hidden' }}>
+                  <div style={{ width: `${(amt / maxCategory) * 100}%`, height: '100%', background: 'var(--accent)', borderRadius: 'var(--radius-pill)' }} />
                 </div>
-              ))}
+                <span className="text-footnote" style={{ width: 72, textAlign: 'end' }}>{formatILS(amt)}</span>
+              </div>
+            ))}
           </div>
         )}
-      </div>
 
-      <div className="print-area bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 text-slate-500 text-xs">
-              <th className="px-3 py-2 text-start font-semibold">תאריך</th>
-              <th className="px-3 py-2 text-start font-semibold">קטגוריה</th>
-              <th className="px-3 py-2 text-start font-semibold hidden sm:table-cell">ספק</th>
-              <th className="px-3 py-2 text-start font-semibold">מקור</th>
-              <th className="px-3 py-2 text-start font-semibold">סכום</th>
-              <th className="px-3 py-2 no-print"></th>
-              {!readOnly && <th className="px-3 py-2 no-print"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {expenses?.map((e) => {
-              const hasReceipt = e.receiptFileName || e.receiptUrl;
-              return (
-                <tr key={e.id} className="border-t border-slate-100">
-                  <td className="px-3 py-2 whitespace-nowrap">{formatDateHe(e.date)}</td>
-                  <td className="px-3 py-2">{e.category}</td>
-                  <td className="px-3 py-2 hidden sm:table-cell text-slate-500">{e.supplierName || '—'}</td>
-                  <td className="px-3 py-2">{PAID_FROM_OPTIONS.find((o) => o.value === e.paidFrom)?.label || e.paidFrom}</td>
-                  <td className="px-3 py-2 font-medium">{formatILS(e.amount)}</td>
-                  <td className="px-3 py-2 no-print">
-                    <button
-                      onClick={() => setReceiptExpense(e)}
-                      className={`flex items-center gap-1 text-xs ${hasReceipt ? 'text-blue-600' : 'text-slate-300'} hover:text-blue-700`}
-                      title={hasReceipt ? 'צפייה בקבלה' : readOnly ? 'אין קבלה' : 'צירוף קבלה'}
-                    >
-                      <Paperclip size={14} />
-                    </button>
-                  </td>
-                  {!readOnly && (
-                    <td className="px-3 py-2 no-print">
-                      <button onClick={() => remove(e.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={14} /></button>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>תאריך</th><th>פירוט</th><th className="hidden sm:table-cell">מקור</th><th>סכום</th><th className="no-print" />
+              </tr>
+            </thead>
+            <tbody>
+              {expenses?.map((e) => {
+                const hasReceipt = e.receiptFileName || e.receiptUrl;
+                return (
+                  <tr key={e.id}>
+                    <td className="whitespace-nowrap">{formatDateHe(e.date)}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{e.description || e.category}</div>
+                      <div className="text-footnote text-secondary row" style={{ flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+                        <span>{e.category}</span>
+                        {e.supplierName && <span>· {e.supplierName}</span>}
+                        {e.taskId && <span className="chip"><Link2 size={12} /> ממשימה</span>}
+                        {e.recurringItemId && <span className="chip"><Repeat size={12} /> צפויה</span>}
+                        {e.complexExpenseId && <span className="chip"><Network size={12} /> מתחם</span>}
+                      </div>
                     </td>
-                  )}
-                </tr>
-              );
-            })}
-            {expenses?.length === 0 && (
-              <tr><td colSpan={7} className="text-center text-slate-400 py-8 text-sm">אין הוצאות בטווח שנבחר</td></tr>
-            )}
-          </tbody>
-        </table>
+                    <td className="hidden sm:table-cell">{PAID_FROM_OPTIONS.find((o) => o.value === e.paidFrom)?.label || e.paidFrom}</td>
+                    <td style={{ fontWeight: 600 }}>{formatILS(e.amount)}</td>
+                    <td className="no-print whitespace-nowrap">
+                      <button className="icon-btn" style={{ width: 36, height: 36, color: hasReceipt ? 'var(--accent)' : undefined }} onClick={() => setReceiptExpense(e)} title={hasReceipt ? 'צפייה בקבלה' : 'צירוף קבלה'} aria-label="קבלה"><Paperclip size={18} /></button>
+                      <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => onEdit(e)} title="עריכה" aria-label="עריכה"><Pencil size={18} /></button>
+                      <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => setConfirmDelete(e)} title="מחיקה" aria-label="מחיקה"><Trash2 size={18} /></button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {expenses?.length === 0 && <tr><td colSpan={5} className="empty">אין הוצאות בטווח שנבחר</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <button onClick={() => window.print()} className="btn btn--secondary no-print" style={{ alignSelf: 'flex-start' }}><Printer size={20} /> ייצוא דו"ח להדפסה</button>
       </div>
 
-      {receiptExpense && (
-        <ReceiptModal
-          buildingId={buildingId}
-          expense={receiptExpense}
-          readOnly={readOnly}
-          onClose={() => setReceiptExpense(null)}
-          onChanged={load}
-        />
+      {receiptExpense && <ReceiptModal buildingId={buildingId} expense={receiptExpense} onClose={() => setReceiptExpense(null)} onChanged={load} />}
+      {confirmDelete && (
+        <Sheet title="מחיקת הוצאה" onClose={() => setConfirmDelete(null)}>
+          <div className="stack">
+            <p style={{ margin: 0 }}>למחוק את "{confirmDelete.description || confirmDelete.category}" ({formatILS(confirmDelete.amount)})? היתרה בקופה תתעדכן.</p>
+            {confirmDelete.taskId && <div className="alert alert--warning">ההוצאה נרשמה ממשימה - עלות המשימה תתאפס.</div>}
+            <button className="btn btn--danger" onClick={() => remove(confirmDelete)}>מחיקה</button>
+          </div>
+        </Sheet>
       )}
-    </div>
+    </>
   );
 }
 
-function ReceiptModal({ buildingId, expense, readOnly, onClose, onChanged }) {
+// ------------------------------------------------------------------------------ expected items
+function Expected({ buildingId, onPay, onChanged }) {
+  const [items, setItems] = useState(null);
+  const [sheet, setSheet] = useState(null); // { item? } | null
+  const [showExcel, setShowExcel] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const load = useCallback(() => api.getRecurring(buildingId).then(setItems), [buildingId]);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async (data) => {
+    if (sheet?.item) await api.updateRecurring(buildingId, sheet.item.id, data);
+    else await api.createRecurring(buildingId, data);
+    setSheet(null);
+    await load();
+  };
+
+  const openTask = async (item) => {
+    await api.createTask(buildingId, { title: item.title, recurringItemId: item.id, dueDate: nextOccurrence(item) });
+    setNotice(`נפתחה משימה "${item.title}" - אפשר לראות אותה במסך המשימות.`);
+    await load();
+  };
+
+  const groups = [
+    ['MONTHLY', 'חודשיות'],
+    ['ANNUAL', 'שנתיות'],
+    ['ONE_TIME', 'חד־פעמיות'],
+  ];
+  const monthlyTotal = (items || []).filter((i) => i.active && i.frequency === 'MONTHLY').reduce((s, i) => s + (i.expectedAmount || 0), 0);
+  const annualTotal = (items || []).filter((i) => i.active && i.frequency === 'ANNUAL').reduce((s, i) => s + (i.expectedAmount || 0), 0);
+
+  return (
+    <>
+      <div className="row no-print" style={{ flexWrap: 'wrap' }}>
+        <button className="btn btn--secondary" onClick={() => setSheet({})}><ClipboardPlus size={20} /> הוצאה צפויה חדשה</button>
+        <button className="btn btn--secondary" onClick={() => setShowExcel(true)}><FileSpreadsheet size={20} /> טעינה מ-Excel</button>
+      </div>
+
+      {notice && <div className="alert alert--success" role="status">{notice}</div>}
+
+      {items && items.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="tile"><span className="stat-label">חודשיות - סה"כ לחודש</span><span className="stat-value stat-value--md">{formatILS(monthlyTotal)}</span></div>
+          <div className="tile"><span className="stat-label">שנתיות - סה"כ לשנה</span><span className="stat-value stat-value--md">{formatILS(annualTotal)}</span></div>
+        </div>
+      )}
+
+      {items && items.length === 0 && (
+        <div className="card empty stack" style={{ alignItems: 'center' }}>
+          <Wallet size={32} color="var(--label-secondary)" />
+          <p style={{ margin: 0 }}>עוד לא הגדרתם הוצאות צפויות. הוסיפו ידנית או טענו קובץ Excel - הן יופיעו בלוח הבקרה כשהחודש מתקרב.</p>
+        </div>
+      )}
+
+      {groups.map(([freq, title]) => {
+        const rows = (items || []).filter((i) => i.frequency === freq);
+        if (rows.length === 0) return null;
+        return (
+          <section key={freq} className="stack" style={{ gap: 'var(--space-2)' }}>
+            <h2 style={{ margin: 0 }}>{title}</h2>
+            <ul className="list">
+              {rows.map((item) => (
+                <li key={item.id} style={{ opacity: item.active ? 1 : 0.5, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <h3 style={{ margin: 0 }}>{item.title}</h3>
+                    <p className="text-footnote text-secondary" style={{ margin: 0 }}>
+                      {item.category} · {describeSchedule(item)}{item.expectedAmount != null ? ` · ${formatILS(item.expectedAmount)}` : ''}
+                      {item.tasksCount > 0 ? ` · ${item.tasksCount} משימות` : ''}{item.expensesCount > 0 ? ` · ${item.expensesCount} תשלומים` : ''}
+                    </p>
+                  </div>
+                  <div className="row no-print" style={{ flexWrap: 'wrap' }}>
+                    <button className="btn btn--primary btn--small" onClick={() => onPay(item)}>רישום תשלום</button>
+                    <button className="btn btn--secondary btn--small" onClick={() => openTask(item)}>פתיחת משימה</button>
+                    <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => setSheet({ item })} aria-label="עריכה"><Pencil size={18} /></button>
+                    <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => setConfirmDelete(item)} aria-label="מחיקה"><Trash2 size={18} /></button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+
+      {sheet && <RecurringItemSheet item={sheet.item} onClose={() => setSheet(null)} onSave={save} />}
+      {showExcel && (
+        <ExcelImportSheet
+          buildingId={buildingId}
+          onClose={() => setShowExcel(false)}
+          onImported={async (count) => { setShowExcel(false); setNotice(`נטענו ${count} פריטים.`); await load(); }}
+        />
+      )}
+      {confirmDelete && (
+        <Sheet title="מחיקת פריט צפוי" onClose={() => setConfirmDelete(null)}>
+          <div className="stack">
+            <p style={{ margin: 0 }}>למחוק את "{confirmDelete.title}" ({FREQUENCY_LABELS[confirmDelete.frequency]})? משימות ותשלומים שכבר נרשמו ממנו יישארו.</p>
+            <button className="btn btn--danger" onClick={async () => { await api.deleteRecurring(buildingId, confirmDelete.id); setConfirmDelete(null); await load(); await onChanged(); }}>מחיקה</button>
+          </div>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
+// ------------------------------------------------------------------------------ receipt
+function ReceiptModal({ buildingId, expense, onClose, onChanged }) {
   const [uploading, setUploading] = useState(false);
   const hasFile = Boolean(expense.receiptFileName);
   const receiptUrl = hasFile ? api.getReceiptUrl(buildingId, expense.id) : expense.receiptUrl;
@@ -188,56 +340,25 @@ function ReceiptModal({ buildingId, expense, readOnly, onClose, onChanged }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800">קבלה - {expense.category}</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
-        </div>
-        <div className="px-5 py-4 space-y-3">
-          {receiptUrl ? (
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
-              {hasFile && isImage ? (
-                <img src={receiptUrl} alt="קבלה" className="w-full max-h-64 object-contain bg-slate-50" />
-              ) : (
-                <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-3 text-sm text-blue-600 hover:bg-slate-50">
-                  <Paperclip size={16} /> פתיחת הקבלה
-                </a>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400 text-center py-4">אין קבלה מצורפת</p>
-          )}
-
-          {!readOnly && (
-            <>
-              <label className="flex items-center justify-center gap-2 border border-dashed border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-500 cursor-pointer hover:bg-slate-50">
-                <Upload size={16} />
-                {uploading ? 'מעלה...' : receiptUrl ? 'החלפת הקבלה' : 'העלאת קבלה'}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                  disabled={uploading}
-                  onChange={(e) => upload(e.target.files?.[0])}
-                />
-              </label>
-              {hasFile && (
-                <button onClick={remove} className="w-full text-xs text-red-600 hover:underline">הסרת הקבלה</button>
-              )}
-            </>
-          )}
-        </div>
+    <Sheet title={`קבלה - ${expense.category}`} onClose={onClose}>
+      <div className="stack">
+        {receiptUrl ? (
+          <div className="card card--flush">
+            {hasFile && isImage ? (
+              <img src={receiptUrl} alt="קבלה" style={{ width: '100%', maxHeight: 280, objectFit: 'contain' }} />
+            ) : (
+              <a href={receiptUrl} target="_blank" rel="noopener noreferrer" className="row" style={{ padding: 'var(--space-4)' }}><Paperclip size={20} /> פתיחת הקבלה</a>
+            )}
+          </div>
+        ) : (
+          <p className="empty">אין קבלה מצורפת</p>
+        )}
+        <label className="btn btn--secondary" style={{ cursor: 'pointer' }}>
+          <Upload size={20} /> {uploading ? 'מעלה...' : receiptUrl ? 'החלפת הקבלה' : 'העלאת קבלה'}
+          <input type="file" accept="image/*,application/pdf" className="hidden" disabled={uploading} onChange={(e) => upload(e.target.files?.[0])} />
+        </label>
+        {hasFile && <button onClick={remove} className="btn btn--danger btn--small" style={{ alignSelf: 'center' }}>הסרת הקבלה</button>}
       </div>
-    </div>
-  );
-}
-
-function SummaryBox({ label, value }) {
-  return (
-    <div className="bg-slate-50 rounded-lg px-2.5 py-2 text-center">
-      <p className="text-[10px] text-slate-500">{label}</p>
-      <p className="font-bold text-slate-800 text-sm">{value}</p>
-    </div>
+    </Sheet>
   );
 }

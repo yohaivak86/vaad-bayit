@@ -1,19 +1,34 @@
 import { useState, useEffect } from 'react';
-import { Building2, Wrench } from 'lucide-react';
+import { Eye, EyeOff, Wrench, MailCheck } from 'lucide-react';
 import { api } from '../api';
+import AuthLayout from './AuthLayout';
 import ProfessionalRegisterModal from './ProfessionalRegisterModal';
 
-const MODES = [
-  { key: 'login', label: 'התחברות' },
-  { key: 'register', label: 'בניין חדש' },
-  { key: 'join', label: 'הצטרפות' },
-];
+// Two entry points only: sign in, or open a new user. After a new user is created, the next step
+// (JoinOrCreate) asks for an invite number or a building search, or lets them open a building.
+// Also handles "forgot password" and the e-mailed reset link (?reset=<token>).
+const CAPTIONS = {
+  login: 'ברוכים השבים. הבניין שלכם מחכה.',
+  signup: 'משתמש חדש ב-30 שניות. אחר כך מצטרפים לבניין או פותחים אחד.',
+  forgot: 'נשלח אליכם קישור לאיפוס הסיסמה.',
+  reset: 'בחרו סיסמה חדשה וממשיכים.',
+};
+
+function readResetToken() {
+  try {
+    return new URLSearchParams(window.location.search).get('reset') || '';
+  } catch {
+    return '';
+  }
+}
 
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', buildingName: '', buildingAddress: '', inviteCode: '', complexInviteCode: '', marketingConsent: false });
-  const [inComplex, setInComplex] = useState(false);
+  const resetToken = readResetToken();
+  const [view, setView] = useState(resetToken ? 'reset' : 'login'); // login | signup | forgot | reset
+  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', marketingConsent: false });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
   const [showProfessionalForm, setShowProfessionalForm] = useState(false);
@@ -23,21 +38,27 @@ export default function AuthScreen({ onAuthenticated }) {
   }, []);
 
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const go = (next) => { setView(next); setError(''); setNotice(''); setShowPassword(false); };
 
   const submit = async (e) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
     try {
-      if (mode === 'login') {
+      if (view === 'login') {
         const { user } = await api.login(form.email, form.password);
         onAuthenticated(user);
-      } else if (mode === 'register') {
-        const res = await api.register({ ...form, complexInviteCode: inComplex ? form.complexInviteCode : '' });
-        onAuthenticated(res.user);
+      } else if (view === 'signup') {
+        const { user } = await api.signup(form);
+        onAuthenticated(user);
+      } else if (view === 'forgot') {
+        await api.forgotPassword(form.email);
+        setNotice('אם הכתובת רשומה אצלנו, נשלח אליה קישור לאיפוס הסיסמה. הקישור תקף לשעה.');
       } else {
-        const res = await api.joinBuilding(form);
-        onAuthenticated(res.user);
+        const { user } = await api.resetPassword(resetToken, form.password);
+        window.history.replaceState({}, '', window.location.pathname);
+        onAuthenticated(user);
       }
     } catch (err) {
       setError(err.message);
@@ -46,150 +67,100 @@ export default function AuthScreen({ onAuthenticated }) {
     }
   };
 
+  const needsPassword = view !== 'forgot';
+  const newPassword = view === 'signup' || view === 'reset';
+  const titles = { login: 'התחברות', signup: 'משתמש חדש', forgot: 'שכחתי סיסמה', reset: 'סיסמה חדשה' };
+  const submitLabels = { login: 'התחברות', signup: 'יצירת משתמש', forgot: 'שליחת קישור לאיפוס', reset: 'שמירת סיסמה והתחברות' };
+
   return (
-    <div dir="rtl" className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
-      <div className="w-full max-w-sm space-y-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="flex flex-col items-center mb-5 relative">
-          {stats?.show && (
-            <div className="absolute -top-1 left-0 flex flex-col items-center justify-center bg-emerald-50 border border-emerald-200 rounded-full w-16 h-16 text-emerald-700">
-              <span className="font-extrabold text-lg leading-none">{stats.buildingsCount}</span>
-              <span className="text-[9px] leading-tight">בניינים</span>
+    <AuthLayout focus={view === 'signup' ? 'complex' : 'building'} caption={CAPTIONS[view]} stats={stats}>
+      <div className="auth-card stack">
+        {(view === 'login' || view === 'signup') && (
+          <div className="segmented" style={{ alignSelf: 'center' }} role="tablist">
+            <button type="button" aria-pressed={view === 'login'} onClick={() => go('login')}>התחברות</button>
+            <button type="button" aria-pressed={view === 'signup'} onClick={() => go('signup')}>משתמש חדש</button>
+          </div>
+        )}
+
+        <form onSubmit={submit} className="card card--floating stack" noValidate={false}>
+          <h1 style={{ margin: 0 }}>{titles[view]}</h1>
+
+          {view === 'signup' && (
+            <>
+              <div className="field">
+                <label htmlFor="name">שם מלא</label>
+                <input id="name" className="input" value={form.name} onChange={(e) => set('name', e.target.value)} required autoComplete="name" />
+              </div>
+              <div className="field">
+                <label htmlFor="phone">טלפון</label>
+                <input id="phone" className="input" value={form.phone} onChange={(e) => set('phone', e.target.value)} required placeholder="050-1234567" inputMode="tel" autoComplete="tel" dir="ltr" style={{ textAlign: 'start' }} />
+              </div>
+            </>
+          )}
+
+          {view !== 'reset' && (
+            <div className="field">
+              <label htmlFor="email">אימייל</label>
+              <input id="email" type="email" className="input" value={form.email} onChange={(e) => set('email', e.target.value)} required autoComplete="email" dir="ltr" style={{ textAlign: 'start' }} />
             </div>
           )}
-          <div className="bg-blue-600 text-white rounded-xl p-2.5 mb-2">
-            <Building2 size={24} />
-          </div>
-          <h1 className="font-extrabold text-lg text-slate-800">ועד בית</h1>
-          <p className="text-xs text-slate-500">מערכת ניהול עצמי לבניין מגורים</p>
-        </div>
 
-        <div className="flex mb-4 rounded-lg bg-slate-100 p-1 text-sm font-medium">
-          {MODES.map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setMode(m.key)}
-              className={`flex-1 rounded-md py-1.5 transition ${mode === m.key ? 'bg-white shadow text-slate-800' : 'text-slate-500'}`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-
-        <form onSubmit={submit} className="space-y-3">
-          {mode === 'register' && (
-            <>
-              <Field label="שם הבניין">
-                <input value={form.buildingName} onChange={(e) => set('buildingName', e.target.value)} className="input" required placeholder='לדוגמה: נחל דליות 8' />
-              </Field>
-              <Field label="כתובת (אופציונלי)">
-                <input value={form.buildingAddress} onChange={(e) => set('buildingAddress', e.target.value)} className="input" />
-              </Field>
-              <Field label="סוג הבניין">
-                <div className="flex gap-2">
-                  {[{ v: false, label: 'בניין בודד' }, { v: true, label: 'חלק ממתחם' }].map((opt) => (
-                    <button
-                      type="button"
-                      key={String(opt.v)}
-                      onClick={() => setInComplex(opt.v)}
-                      className={`flex-1 rounded-xl border py-2 text-sm font-medium ${inComplex === opt.v ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 text-slate-600'}`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                {inComplex ? (
-                  <input
-                    value={form.complexInviteCode}
-                    onChange={(e) => set('complexInviteCode', e.target.value.toUpperCase())}
-                    className="input mt-2 text-center font-mono tracking-widest"
-                    placeholder="קוד הזמנה למתחם"
-                    required
-                  />
-                ) : (
-                  <p className="mt-1 text-[11px] text-slate-400">אפשר לשייך את הבניין למתחם גם בהמשך, מפרופיל הבניין.</p>
-                )}
-              </Field>
-              <Field label="שם מלא">
-                <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
-              </Field>
-              <Field label="טלפון">
-                <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" required placeholder="050-1234567" />
-              </Field>
-            </>
-          )}
-
-          {mode === 'join' && (
-            <>
-              <Field label="קוד הזמנה לבניין">
+          {needsPassword && (
+            <div className="field">
+              <label htmlFor="password">{view === 'reset' ? 'סיסמה חדשה' : 'סיסמה'}</label>
+              <div className="input-affix">
                 <input
-                  value={form.inviteCode}
-                  onChange={(e) => set('inviteCode', e.target.value.toUpperCase())}
-                  className="input font-mono tracking-widest text-center"
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  className="input"
+                  value={form.password}
+                  onChange={(e) => set('password', e.target.value)}
                   required
-                  placeholder="ABCD1234"
+                  minLength={newPassword ? 8 : undefined}
+                  autoComplete={newPassword ? 'new-password' : 'current-password'}
                 />
-              </Field>
-              <Field label="שם מלא">
-                <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />
-              </Field>
-              <Field label="טלפון">
-                <input value={form.phone} onChange={(e) => set('phone', e.target.value)} className="input" required placeholder="050-1234567" />
-              </Field>
-            </>
+                <span className="affix">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={() => setShowPassword((s) => !s)}
+                    aria-label={showPassword ? 'הסתרת הסיסמה' : 'הצגת הסיסמה'}
+                    aria-pressed={showPassword}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </span>
+              </div>
+              {newPassword && <span className="text-footnote text-secondary">לפחות 8 תווים</span>}
+            </div>
           )}
 
-          <Field label="אימייל">
-            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} className="input" required />
-          </Field>
-          <Field label="סיסמה">
-            <input type="password" value={form.password} onChange={(e) => set('password', e.target.value)} className="input" required minLength={mode !== 'login' ? 8 : undefined} />
-          </Field>
-
-          {mode !== 'login' && (
-            <label className="flex items-start gap-2 text-xs text-slate-500">
-              <input
-                type="checkbox"
-                checked={form.marketingConsent}
-                onChange={(e) => set('marketingConsent', e.target.checked)}
-                className="mt-0.5"
-              />
-              <span>אני מעוניין/ת לקבל עדכונים והתראות מהמערכת (אופציונלי)</span>
+          {view === 'signup' && (
+            <label className="row text-footnote text-secondary" style={{ alignItems: 'flex-start', gap: 'var(--space-2)' }}>
+              <input type="checkbox" checked={form.marketingConsent} onChange={(e) => set('marketingConsent', e.target.checked)} style={{ marginTop: 3 }} />
+              <span>אשמח לקבל עדכונים והתראות מהמערכת (לא חובה)</span>
             </label>
           )}
 
-          {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <div className="alert alert--danger" role="alert">{error}</div>}
+          {notice && <div className="alert alert--success row" role="status"><MailCheck size={20} /> <span>{notice}</span></div>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition"
-          >
-            {loading ? 'רגע...' : mode === 'login' ? 'התחברות' : mode === 'register' ? 'יצירת בניין וחשבון' : 'הצטרפות לבניין'}
-          </button>
+          <button type="submit" disabled={loading} className="btn btn--primary">{loading ? 'רגע...' : submitLabels[view]}</button>
+
+          {view === 'login' && (
+            <button type="button" className="btn btn--secondary btn--small" style={{ alignSelf: 'center' }} onClick={() => go('forgot')}>שכחתי סיסמה</button>
+          )}
+          {(view === 'forgot' || view === 'reset') && (
+            <button type="button" className="btn btn--secondary btn--small" style={{ alignSelf: 'center' }} onClick={() => go('login')}>חזרה להתחברות</button>
+          )}
         </form>
-      </div>
 
-      <button
-        onClick={() => setShowProfessionalForm(true)}
-        className="w-full flex items-center justify-center gap-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-2xl px-4 py-3 text-sm font-medium transition"
-      >
-        <Wrench size={16} />
-        בעל מקצוע ורוצה לתת שירות? הירשם כאן
-      </button>
+        <button type="button" onClick={() => setShowProfessionalForm(true)} className="btn btn--secondary">
+          <Wrench size={20} /> בעל מקצוע ורוצה לתת שירות? הירשמו כאן
+        </button>
       </div>
 
       {showProfessionalForm && <ProfessionalRegisterModal onClose={() => setShowProfessionalForm(false)} />}
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
-      {children}
-    </div>
+    </AuthLayout>
   );
 }

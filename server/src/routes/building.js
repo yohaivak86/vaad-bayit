@@ -16,9 +16,9 @@ router.get('/', async (req, res) => {
 
   const member = await prisma.complexMember.findUnique({
     where: { buildingId: req.buildingId },
-    include: { complex: { select: { name: true } } },
+    include: { complex: { select: { name: true, number: true } } },
   });
-  const complexInfo = { complexId: member?.complexId ?? null, complexName: member?.complex?.name ?? null };
+  const complexInfo = { complexId: member?.complexId ?? null, complexName: member?.complex?.name ?? null, complexNumber: member?.complex?.number ?? null };
 
   if (req.buildingRole === 'COMMITTEE') return res.json({ ...building, ...complexInfo });
   res.json({ ...Object.fromEntries(PUBLIC_BUILDING_FIELDS.map((k) => [k, building[k]])), ...complexInfo });
@@ -54,8 +54,17 @@ router.put('/', requireCommittee, async (req, res) => {
 });
 
 router.get('/balance', requireCommittee, async (req, res) => {
-  const balance = await getBalance(req.buildingId);
-  res.json(balance);
+  const [balance, building] = await Promise.all([getBalance(req.buildingId), getBuilding(req.buildingId)]);
+  const redLine = Number(building.treasuryRedLine);
+  res.json({ ...balance, redLine, belowRedLine: balance.totalBalance < redLine });
+});
+
+// The treasury must stay above this line - a reserve for unplanned work. Shown on the dashboard.
+router.put('/red-line', requireCommittee, async (req, res) => {
+  const value = Number(req.body.treasuryRedLine);
+  if (!(value >= 0)) return res.status(400).json({ error: 'יש להזין סכום תקין' });
+  await prisma.building.update({ where: { id: req.buildingId }, data: { treasuryRedLine: value } });
+  res.json({ redLine: value });
 });
 
 // Invalidates the current invite code (e.g. if it leaked) and issues a fresh one.
@@ -89,6 +98,21 @@ router.post('/complex/join', requireCommittee, async (req, res) => {
     throw err;
   }
   res.status(201).json({ complexId: complex.id, complexName: complex.name });
+});
+
+// Join requests this building sent to complexes found through the search (waiting for the owner).
+router.get('/complex/requests', requireCommittee, async (req, res) => {
+  const requests = await prisma.complexJoinRequest.findMany({
+    where: { buildingId: req.buildingId, status: 'PENDING' },
+    include: { complex: { select: { id: true, number: true, name: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(requests.map((r) => ({ id: r.id, createdAt: r.createdAt, complex: r.complex })));
+});
+
+router.delete('/complex/requests/:requestId', requireCommittee, async (req, res) => {
+  await prisma.complexJoinRequest.deleteMany({ where: { id: Number(req.params.requestId), buildingId: req.buildingId, status: 'PENDING' } });
+  res.status(204).end();
 });
 
 router.post('/complex/leave', requireCommittee, async (req, res) => {

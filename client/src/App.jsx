@@ -11,6 +11,8 @@ import ProfessionalsDirectoryModal from './components/ProfessionalsDirectoryModa
 import ComplexDetailModal from './components/ComplexDetailModal';
 import AuthScreen from './components/AuthScreen';
 import BuildingSelector from './components/BuildingSelector';
+import JoinOrCreate from './components/JoinOrCreate';
+import ComplexRequests from './components/ComplexRequests';
 import AnnouncementsBoard from './components/AnnouncementsBoard';
 import SuggestionButton from './components/SuggestionButton';
 import TimelineDashboard from './components/tabs/TimelineDashboard';
@@ -23,6 +25,7 @@ import DocumentsTab from './components/tabs/DocumentsTab';
 import BuildingProfile from './components/tabs/BuildingProfile';
 import ComplexProfile from './components/tabs/ComplexProfile';
 import { api } from './api';
+import { createExpenseFromForm } from './lib/expenseSave';
 
 const NAV_ITEMS = {
   dashboard: { label: 'ציר זמן ולוח בקרה', icon: CalendarRange },
@@ -59,6 +62,8 @@ export default function App() {
   const [showManageAdmins, setShowManageAdmins] = useState(false);
   const [showProfessionals, setShowProfessionals] = useState(false);
   const [showComplexFinance, setShowComplexFinance] = useState(false);
+  const [version, setVersion] = useState(0); // bumped after a change made from the header so open tabs reload
+  const [expensePrefill, setExpensePrefill] = useState(null);
 
   useEffect(() => {
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null));
@@ -78,7 +83,7 @@ export default function App() {
   const role = meta?.role === 'COMMITTEE' ? 'COMMITTEE' : 'RESIDENT';
   const isCommittee = role === 'COMMITTEE';
   const isSiteAdmin = user?.role === 'SUPER_ADMIN';
-  const complex = meta?.complexId ? { id: meta.complexId, name: meta.complexName } : null;
+  const complex = meta?.complexId ? { id: meta.complexId, name: meta.complexName, number: meta.complexNumber } : null;
 
   const navKeys = useMemo(() => navKeysFor(role, Boolean(complex)), [role, complex]);
 
@@ -119,9 +124,10 @@ export default function App() {
   };
 
   const saveExpense = async (form, receiptFile) => {
-    const created = await api.createExpense(buildingId, form);
-    if (receiptFile) await api.uploadReceipt(buildingId, created.id, receiptFile);
+    await createExpenseFromForm(buildingId, form, receiptFile);
     setShowAddExpense(false);
+    setExpensePrefill(null);
+    setVersion((v) => v + 1);
     await refreshBalance();
   };
 
@@ -135,7 +141,7 @@ export default function App() {
   };
 
   if (user === undefined) {
-    return <div className="flex min-h-screen items-center justify-center text-sm text-slate-400">טוען...</div>;
+    return <div className="empty" style={{ paddingBlock: 'var(--space-8)' }}>טוען...</div>;
   }
 
   if (!user) {
@@ -144,7 +150,16 @@ export default function App() {
 
   if (!buildingId) {
     if (!buildings) {
-      return <div className="flex min-h-screen items-center justify-center text-sm text-slate-400">טוען...</div>;
+      return <div className="empty" style={{ paddingBlock: 'var(--space-8)' }}>טוען...</div>;
+    }
+    // A brand-new user (no building yet): join one by invite number / search, or open one.
+    if (buildings.length === 0 && !isSiteAdmin) {
+      return (
+        <JoinOrCreate
+          onLogout={logout}
+          onDone={async (id) => { await loadBuildings(); if (id) setBuildingId(id); }}
+        />
+      );
     }
     return (
       <>
@@ -169,19 +184,29 @@ export default function App() {
       showSwitch={buildings && (buildings.length > 1 || isSiteAdmin)}
       onSwitchBuilding={() => setBuildingId(null)}
       onLogout={logout}
-      onAddExpense={() => setShowAddExpense(true)}
+      onAddExpense={() => { setExpensePrefill(null); setShowAddExpense(true); }}
       onApprovePayment={() => setShowApprovePayment(true)}
       onManageAdmins={() => setShowManageAdmins(true)}
       onOpenSettings={() => setShowSettings(true)}
       onOpenProfessionals={() => setShowProfessionals(true)}
     >
+      {isCommittee && <ComplexRequests onChanged={loadBuildings} />}
       <AnnouncementsBoard buildingId={buildingId} readOnly={!isCommittee} />
 
-      {tab === 'dashboard' && <TimelineDashboard buildingId={buildingId} role={role} balance={balance} complexName={complex?.name} />}
+      {tab === 'dashboard' && <TimelineDashboard
+          key={`dash-${version}`}
+          buildingId={buildingId}
+          role={role}
+          balance={balance}
+          complexName={complex?.name}
+          onBalanceChanged={refreshBalance}
+          onOpenTasks={() => setTab('tasks')}
+          onPayExpected={(item) => { setExpensePrefill(item); setShowAddExpense(true); }}
+        />}
       {tab === 'me' && <MyPage buildingId={buildingId} />}
       {tab === 'tenants' && isCommittee && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={false} />}
-      {tab === 'tasks' && <TasksTab buildingId={buildingId} readOnly={!isCommittee} />}
-      {tab === 'expenses' && isCommittee && <ExpensesTab buildingId={buildingId} building={building} readOnly={false} />}
+      {tab === 'tasks' && <TasksTab buildingId={buildingId} isCommittee={isCommittee} onBalanceChanged={refreshBalance} />}
+      {tab === 'expenses' && isCommittee && <ExpensesTab key={`exp-${version}`} buildingId={buildingId} building={building} onBalanceChanged={refreshBalance} />}
       {tab === 'budget' && isCommittee && <BudgetTab buildingId={buildingId} readOnly={false} />}
       {tab === 'documents' && isCommittee && <DocumentsTab buildingId={buildingId} readOnly={false} />}
       {tab === 'building' && (
@@ -204,7 +229,7 @@ export default function App() {
       {showSettings && isCommittee && (
         <OnboardingModal building={building} onClose={() => setShowSettings(false)} onSave={saveSettings} />
       )}
-      {showAddExpense && <AddExpenseModal onClose={() => setShowAddExpense(false)} onSave={saveExpense} />}
+      {showAddExpense && <AddExpenseModal prefill={expensePrefill} onClose={() => { setShowAddExpense(false); setExpensePrefill(null); }} onSave={saveExpense} />}
       {showApprovePayment && (
         <ApprovePaymentModal buildingId={buildingId} onClose={() => setShowApprovePayment(false)} onApproved={refreshBalance} />
       )}

@@ -4,6 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 const { generateInviteCode } = require('../lib/inviteCode');
 const { computeSplits } = require('../lib/complexSplit');
 const { round2 } = require('../lib/calc');
+const { sendEmail } = require('../lib/email');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -11,7 +12,9 @@ router.use(requireAuth);
 function publicComplex(complex, { includeInviteCode }) {
   return {
     id: complex.id,
+    number: complex.number,
     name: complex.name,
+    address: complex.address,
     ownerId: complex.ownerId,
     ownerName: complex.owner?.name,
     createdAt: complex.createdAt,
@@ -78,17 +81,135 @@ router.get('/mine', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { name } = req.body;
+  const { name, address } = req.body;
   if (!name) return res.status(400).json({ error: 'name הוא שדה חובה' });
   if ((await committeeBuildingIds(req.user)).length === 0) {
     return res.status(403).json({ error: 'רק מנהל אתר או נציג ועד יכולים ליצור מתחם' });
   }
 
   const complex = await prisma.complex.create({
-    data: { name, ownerId: req.user.id, inviteCode: generateInviteCode() },
+    data: { name, address: address || '', ownerId: req.user.id, inviteCode: generateInviteCode() },
     include: { owner: true, members: { include: { building: true } } },
   });
   res.status(201).json(publicComplex(complex, { includeInviteCode: true }));
+});
+
+// Search by complex number, invite code, name or address - the same box for all of them.
+// The invite code is never returned here; only the number / name / address identify the complex.
+router.get('/search', async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  if (q.length < 1) return res.json([]);
+
+  const or = [
+    { name: { contains: q, mode: 'insensitive' } },
+    { address: { contains: q, mode: 'insensitive' } },
+    { inviteCode: q.toUpperCase() },
+  ];
+  if (/^\d{1,9}$/.test(q)) or.push({ number: Number(q) });
+
+  const [complexes, myBuildings, pending] = await Promise.all([
+    prisma.complex.findMany({
+      where: { OR: or },
+      include: { owner: { select: { name: true } }, _count: { select: { members: true } } },
+      orderBy: { number: 'asc' },
+      take: 10,
+    }),
+    committeeBuildingIds(req.user),
+    prisma.complexJoinRequest.findMany({ where: { status: 'PENDING' }, select: { complexId: true, buildingId: true } }),
+  ]);
+  const requestedIds = new Set(pending.filter((p) => myBuildings.includes(p.buildingId)).map((p) => p.complexId));
+
+  res.json(
+    complexes.map((c) => ({
+      id: c.id,
+      number: c.number,
+      name: c.name,
+      address: c.address,
+      ownerName: c.owner?.name,
+      buildingsCount: c._count.members,
+      requested: requestedIds.has(c.id),
+    }))
+  );
+});
+
+// All pending requests across the complexes the caller owns - drives the badge in the UI.
+router.get('/requests/incoming', async (req, res) => {
+  const requests = await prisma.complexJoinRequest.findMany({
+    where: { status: 'PENDING', ...(req.user.role === 'SUPER_ADMIN' ? {} : { complex: { ownerId: req.user.id } }) },
+    include: {
+      complex: { select: { id: true, number: true, name: true } },
+      building: { select: { id: true, name: true, address: true, apartmentsCount: true } },
+      requestedBy: { select: { name: true, phone: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+  res.json(
+    requests.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      complex: r.complex,
+      building: r.building,
+      requestedBy: r.requestedBy?.name,
+      requestedByPhone: r.requestedBy?.phone,
+    }))
+  );
+});
+
+router.post('/requests/:requestId/:decision(approve|reject)', async (req, res) => {
+  const request = await prisma.complexJoinRequest.findUnique({
+    where: { id: Number(req.params.requestId) },
+    include: { complex: true },
+  });
+  if (!request || request.status !== 'PENDING') return res.status(404).json({ error: 'הבקשה לא נמצאה או שכבר טופלה' });
+  if (request.complex.ownerId !== req.user.id && req.user.role !== 'SUPER_ADMIN') {
+    return res.status(403).json({ error: 'רק בעל המתחם יכול לאשר או לדחות בקשות' });
+  }
+
+  if (req.params.decision === 'reject') {
+    await prisma.complexJoinRequest.update({ where: { id: request.id }, data: { status: 'REJECTED' } });
+    return res.json({ status: 'REJECTED' });
+  }
+
+  try {
+    await prisma.$transaction([
+      prisma.complexMember.create({ data: { complexId: request.complexId, buildingId: request.buildingId } }),
+      prisma.complexJoinRequest.update({ where: { id: request.id }, data: { status: 'APPROVED' } }),
+    ]);
+  } catch (err) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'הבניין כבר חבר במתחם אחר' });
+    throw err;
+  }
+  res.json({ status: 'APPROVED' });
+});
+
+// A committee rep of a building asks to join a complex found through the search.
+router.post('/:id/join-requests', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  const buildingId = Number(req.body.buildingId);
+  if (!buildingId) return res.status(400).json({ error: 'buildingId הוא שדה חובה' });
+  if (!(await committeeBuildingIds(req.user)).includes(buildingId)) {
+    return res.status(403).json({ error: 'רק נציג ועד של הבניין יכול לבקש לשייך אותו למתחם' });
+  }
+  if (await prisma.complexMember.findUnique({ where: { buildingId } })) {
+    return res.status(409).json({ error: 'הבניין כבר משויך למתחם - יש להסיר אותו ממנו קודם' });
+  }
+
+  const request = await prisma.complexJoinRequest.upsert({
+    where: { complexId_buildingId: { complexId: complex.id, buildingId } },
+    update: { status: 'PENDING', requestedById: req.user.id },
+    create: { complexId: complex.id, buildingId, requestedById: req.user.id },
+    include: { building: { select: { name: true } } },
+  });
+
+  if (complex.owner?.email) {
+    sendEmail({
+      to: complex.owner.email,
+      subject: `בקשת הצטרפות למתחם ${complex.name}`,
+      text: `הבניין "${request.building.name}" מבקש להצטרף למתחם ${complex.name} (מספר ${complex.number}).\nיש להיכנס למערכת ← מתחמים כדי לאשר או לדחות את הבקשה.`,
+    });
+  }
+  res.status(201).json({ id: request.id, status: request.status, complexName: complex.name });
 });
 
 router.get('/:id', async (req, res) => {
@@ -412,7 +533,7 @@ router.get('/:id/profile', async (req, res) => {
   });
 
   res.json({
-    complex: { id: complex.id, name: complex.name, ownerName: complex.owner?.name },
+    complex: { id: complex.id, number: complex.number, name: complex.name, address: complex.address, ownerName: complex.owner?.name },
     canEdit: isOwner(complex, req.user),
     buildings: complex.members.map((m) => ({
       id: m.buildingId,

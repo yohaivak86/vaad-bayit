@@ -53,7 +53,10 @@ async function requireBuildingAccess(req, res, next) {
 // Residents can't enter data - the only writes they get are under /me (their own details and
 // requests such as reporting a cash payment, which a committee rep must then approve).
 function blockResidentWrites(req, res, next) {
-  if (req.method !== 'GET' && req.buildingRole === 'RESIDENT' && !/^\/me(\/|$)/.test(req.path)) {
+  // Residents may also open a fault (POST /tasks) and edit their own report (PUT /tasks/:id) -
+  // the route itself restricts that to reports they opened.
+  const residentTaskWrite = (req.method === 'POST' && req.path === '/tasks') || (req.method === 'PUT' && /^\/tasks\/\d+$/.test(req.path));
+  if (req.method !== 'GET' && req.buildingRole === 'RESIDENT' && !residentTaskWrite && !/^\/me(\/|$)/.test(req.path)) {
     return res.status(403).json({ error: 'דייר יכול רק לשלוח בקשות - ביצוע שינויים מתבצע על ידי נציג ועד' });
   }
   next();

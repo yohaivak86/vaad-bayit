@@ -1,307 +1,319 @@
-import { useEffect, useState } from 'react';
-import { Plus, X, MapPin, AlertTriangle, CheckSquare, Trash2, Banknote, Pencil } from 'lucide-react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Plus, MapPin, Trash2, Check, Network, Repeat, Phone, CalendarDays, Wrench, Home } from 'lucide-react';
 import { api } from '../../api';
-import { TASK_STATUSES, RECURRING_CHECKLIST, PAID_FROM_OPTIONS } from '../../constants';
+import { PAID_FROM_OPTIONS, TASK_STATUSES } from '../../constants';
 import { formatDateHe, formatILS } from '../../format';
+import { describeSchedule, nextOccurrence } from '../RecurringItemSheet';
+import Sheet from '../Sheet';
 
-export default function TasksTab({ buildingId, readOnly }) {
+const STATUS_DOT = { OPEN: 'danger', IN_PROGRESS: 'warning', CONTRACTOR: 'warning', RESOLVED: 'success' };
+const statusLabel = (v) => TASK_STATUSES.find((s) => s.value === v)?.label || v;
+const isOpen = (t) => t.status !== 'RESOLVED';
+
+// Faults and chores. Anyone in the building can open a fault; committee reps run the rest:
+// plan a chore from the expected list, add a one-off, order a contractor, record what it cost
+// (a cost with a payment source is recorded in the expenses automatically).
+export default function TasksTab({ buildingId, isCommittee, onBalanceChanged }) {
   const [tasks, setTasks] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter] = useState('ALL');
+  const [recurring, setRecurring] = useState([]);
+  const [providers, setProviders] = useState([]);
+  const [filter, setFilter] = useState('OPEN'); // OPEN | RESOLVED | ALL | RESIDENT
+  const [sheet, setSheet] = useState(null); // { task? } | null
 
-  const load = async () => setTasks(await api.getTasks(buildingId));
-  useEffect(() => { load(); }, [buildingId]);
+  const load = useCallback(async () => {
+    setTasks(await api.getTasks(buildingId));
+    if (isCommittee) api.getRecurring(buildingId).then(setRecurring).catch(() => {});
+  }, [buildingId, isCommittee]);
 
-  const updateStatus = async (task, status) => {
-    await api.updateTask(buildingId, task.id, { status });
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.getBuildingProfile(buildingId).then((p) => setProviders(p.providers || [])).catch(() => {}); }, [buildingId]);
+
+  const counts = useMemo(() => ({
+    OPEN: (tasks || []).filter(isOpen).length,
+    RESOLVED: (tasks || []).filter((t) => !isOpen(t)).length,
+    ALL: (tasks || []).length,
+    RESIDENT: (tasks || []).filter((t) => t.residentReported && isOpen(t)).length,
+  }), [tasks]);
+
+  const shown = (tasks || []).filter((t) => {
+    if (filter === 'OPEN') return isOpen(t);
+    if (filter === 'RESOLVED') return !isOpen(t);
+    if (filter === 'RESIDENT') return t.residentReported && isOpen(t);
+    return true;
+  });
+
+  const changed = async () => {
     await load();
+    await onBalanceChanged?.();
   };
 
-  const remove = async (task) => {
-    await api.deleteTask(buildingId, task.id);
-    await load();
+  const resolve = async (task) => {
+    await api.updateTask(buildingId, task.id, { status: 'RESOLVED' });
+    await changed();
   };
 
-  const addRecurring = async (label) => {
-    await api.createTask(buildingId, { title: label, isRecurring: true, recurrenceLabel: label, urgency: 'רגיל' });
-    await load();
-  };
-
-  const saveCost = async (task, cost, paidFrom) => {
-    await api.updateTask(buildingId, task.id, { cost, paidFrom });
-    await load();
-  };
-
-  const filtered = tasks?.filter((t) => filter === 'ALL' || t.status === filter) || [];
+  const filters = [
+    ['OPEN', 'פתוחות'],
+    ...(isCommittee ? [['RESIDENT', 'תקלות דיירים']] : []),
+    ['RESOLVED', 'הושלמו'],
+    ['ALL', 'הכל'],
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-4 pb-24 sm:pb-6">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="font-bold text-slate-800">משימות ותקלות פתוחות</h2>
-        {!readOnly && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg px-3 py-2 transition"
-          >
-            <Plus size={16} /> תקלה / משימה חדשה
-          </button>
-        )}
+    <div className="page stack" style={{ gap: 'var(--space-4)' }}>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+        <div>
+          <h1 className="page-title" style={{ margin: 0 }}>משימות ותקלות</h1>
+          <p className="page-sub" style={{ margin: 0 }}>{isCommittee ? 'תקלות מהדיירים, משימות מתוכננות ובעלי מקצוע' : 'מה קורה בבניין, ופתיחת תקלה חדשה'}</p>
+        </div>
+        <button className="btn btn--primary" onClick={() => setSheet({})}>
+          <Plus size={20} /> {isCommittee ? 'משימה או תקלה חדשה' : 'פתיחת תקלה'}
+        </button>
       </div>
 
-      <div className="flex gap-1.5 mb-3 flex-wrap">
-        <FilterChip label="הכל" active={filter === 'ALL'} onClick={() => setFilter('ALL')} />
-        {TASK_STATUSES.map((s) => (
-          <FilterChip key={s.value} label={s.label} active={filter === s.value} onClick={() => setFilter(s.value)} />
+      <div className="segmented" style={{ alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+        {filters.map(([key, label]) => (
+          <button key={key} aria-pressed={filter === key} onClick={() => setFilter(key)}>{label} ({counts[key]})</button>
         ))}
       </div>
 
-      {!readOnly && (
-        <div className="bg-white rounded-xl border border-slate-200 p-3 mb-4">
-          <p className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-            <CheckSquare size={15} /> משימות תקופתיות קבועות
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {RECURRING_CHECKLIST.map((label) => (
-              <button
-                key={label}
-                onClick={() => addRecurring(label)}
-                className="text-xs border border-slate-200 rounded-full px-3 py-1.5 text-slate-600 hover:bg-slate-50"
-              >
-                + {label}
-              </button>
-            ))}
-          </div>
-        </div>
+      {tasks === null && <p className="empty">טוען...</p>}
+      {tasks && shown.length === 0 && (
+        <div className="card empty">{filter === 'OPEN' ? 'אין כרגע משימות או תקלות פתוחות. כל הכבוד.' : 'אין פריטים להצגה בסינון הזה.'}</div>
       )}
 
-      {!tasks && <p className="text-sm text-slate-500">טוען...</p>}
-      <div className="space-y-2">
-        {filtered.map((task) => (
-          <TaskCard key={task.id} task={task} onStatusChange={updateStatus} onDelete={remove} onSaveCost={saveCost} readOnly={readOnly} />
-        ))}
-        {tasks && filtered.length === 0 && <p className="text-sm text-slate-400 text-center py-8">אין משימות בסטטוס זה</p>}
-      </div>
+      {shown.length > 0 && (
+        <ul className="list">
+          {shown.map((t) => (
+            <li key={t.id} className="is-link" onClick={() => setSheet({ task: t })} style={{ alignItems: 'flex-start' }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="row" style={{ flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                  <h3 style={{ margin: 0 }}>{t.title}</h3>
+                  <span className={`badge badge--${STATUS_DOT[t.status] || 'danger'}`}>{statusLabel(t.status)}</span>
+                  {t.urgency === 'דחוף' && <span className="badge badge--danger">דחוף</span>}
+                  {t.residentReported && <span className="chip"><Home size={12} /> תקלת דייר</span>}
+                  {t.scope === 'COMPLEX' && <span className="chip"><Network size={12} /> מתחם</span>}
+                  {t.recurringTitle && <span className="chip"><Repeat size={12} /> {t.recurringTitle}</span>}
+                </div>
+                <p className="text-footnote text-secondary row" style={{ margin: 0, flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+                  {t.location && <span className="row" style={{ gap: 4 }}><MapPin size={13} /> {t.location}</span>}
+                  {t.dueDate && <span className="row" style={{ gap: 4 }}><CalendarDays size={13} /> {formatDateHe(t.dueDate)}</span>}
+                  {t.contractorName && <span className="row" style={{ gap: 4 }}><Wrench size={13} /> {t.contractorName}</span>}
+                  {t.reportedByName && isCommittee && <span>דווח ע"י {t.reportedByName}</span>}
+                </p>
+                {t.cost != null && (
+                  <p className="text-footnote" style={{ margin: 'var(--space-1) 0 0' }}>
+                    עלות {formatILS(t.cost)} ·{' '}
+                    {t.paidFrom ? <span className="text-secondary">נרשמה בהוצאות</span> : <span className="badge badge--warning">{isCommittee ? 'בחרו מקור תשלום כדי לרשום בהוצאות' : 'ממתין לאישור הוועד'}</span>}
+                  </p>
+                )}
+              </div>
+              {isCommittee && isOpen(t) && t.scope !== 'COMPLEX' && (
+                <button className="btn btn--secondary btn--small" onClick={(e) => { e.stopPropagation(); resolve(t); }}><Check size={16} /> הושלם</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
-      {!readOnly && showForm && (
-        <TaskFormModal
-          onClose={() => setShowForm(false)}
-          onSave={async (form) => { await api.createTask(buildingId, form); setShowForm(false); await load(); }}
+      {sheet && (
+        <TaskSheet
+          task={sheet.task}
+          buildingId={buildingId}
+          isCommittee={isCommittee}
+          recurring={recurring.filter((r) => r.active)}
+          providers={providers}
+          onClose={() => setSheet(null)}
+          onSaved={async () => { setSheet(null); await changed(); }}
         />
       )}
     </div>
   );
 }
 
-function FilterChip({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-xs rounded-full px-3 py-1.5 font-medium border transition ${
-        active ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-600'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
-function TaskCard({ task, onStatusChange, onDelete, onSaveCost, readOnly: readOnlyProp }) {
-  // Complex tasks are shown here for context but managed from the complex profile.
-  const isComplexTask = task.scope === 'COMPLEX';
-  const readOnly = readOnlyProp || isComplexTask;
-  const [showCostForm, setShowCostForm] = useState(false);
-  const paidFromLabel = PAID_FROM_OPTIONS.find((o) => o.value === task.paidFrom)?.label;
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-slate-800 text-sm flex items-center gap-1.5">
-            {task.urgency === 'דחוף' && <AlertTriangle size={14} className="text-red-500 shrink-0" />}
-            {task.title}
-          </p>
-          {task.description && <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>}
-          <div className="flex items-center gap-2 mt-1.5 text-[11px] text-slate-400 flex-wrap">
-            {task.location && (
-              <span className="flex items-center gap-0.5"><MapPin size={11} /> {task.location}</span>
-            )}
-            <span>{task.dueDate ? `יעד: ${formatDateHe(task.dueDate)}` : formatDateHe(task.createdAt)}</span>
-            {task.isRecurring && <span className="text-blue-500">תקופתי</span>}
-            {isComplexTask && (
-              <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">משימת מתחם{task.complexName ? ` · ${task.complexName}` : ''}</span>
-            )}
-          </div>
-        </div>
-        {!readOnly && (
-          <button onClick={() => onDelete(task)} className="p-1 text-slate-300 hover:text-red-500 shrink-0">
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-        {TASK_STATUSES.map((s) => (
-          <button
-            key={s.value}
-            onClick={() => !readOnly && onStatusChange(task, s.value)}
-            disabled={readOnly}
-            className={`text-[11px] rounded-md px-2 py-1 font-medium transition ${
-              task.status === s.value ? s.color : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-            } ${readOnly ? 'cursor-default' : ''}`}
-          >
-            {s.label}
-          </button>
-        ))}
-
-        {task.cost != null ? (
-          <button
-            onClick={() => !readOnly && setShowCostForm(true)}
-            disabled={readOnly}
-            className={`flex items-center gap-1 text-[11px] rounded-md px-2 py-1 font-medium bg-emerald-50 text-emerald-700 ${readOnly ? 'cursor-default' : 'hover:bg-emerald-100'}`}
-          >
-            <Banknote size={11} /> {formatILS(task.cost)}{paidFromLabel ? ` · ${paidFromLabel}` : ''}
-          </button>
-        ) : (
-          !readOnly && (
-            <button
-              onClick={() => setShowCostForm(true)}
-              className="flex items-center gap-1 text-[11px] rounded-md px-2 py-1 font-medium border border-dashed border-slate-300 text-slate-400 hover:text-slate-600 hover:bg-slate-50"
-            >
-              <Banknote size={11} /> הוספת עלות
-            </button>
-          )
-        )}
-      </div>
-
-      {showCostForm && (
-        <TaskCostFormModal
-          task={task}
-          onClose={() => setShowCostForm(false)}
-          onSave={async (cost, paidFrom) => { await onSaveCost(task, cost, paidFrom); setShowCostForm(false); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function TaskCostFormModal({ task, onClose, onSave }) {
-  const [cost, setCost] = useState(task.cost ?? '');
-  const [paidFrom, setPaidFrom] = useState(task.paidFrom || 'BANK');
+// ------------------------------------------------------------------------------ create / edit
+function TaskSheet({ task, buildingId, isCommittee, recurring, providers, onClose, onSaved }) {
+  const editing = Boolean(task);
+  const complexTask = task?.scope === 'COMPLEX';
+  // A resident may open faults and edit only their own unresolved report; everything else is read-only for them.
+  const canEdit = isCommittee ? !complexTask : !editing || (task.mine && task.status !== 'RESOLVED');
+  const [source, setSource] = useState(task?.recurringItemId ? 'RECURRING' : 'NEW');
+  const [form, setForm] = useState({
+    title: task?.title || '',
+    description: task?.description || '',
+    location: task?.location || '',
+    urgency: task?.urgency || 'רגיל',
+    status: task?.status || 'OPEN',
+    dueDate: task?.dueDate ? String(task.dueDate).slice(0, 10) : '',
+    contractorName: task?.contractorName || '',
+    contractorPhone: task?.contractorPhone || '',
+    cost: task?.cost != null ? String(Number(task.cost)) : '',
+    paidFrom: task?.paidFrom || '',
+    showOnTimeline: task?.showOnTimeline ?? true,
+    recurringItemId: task?.recurringItemId || '',
+  });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const pickRecurring = (id) => {
+    const item = recurring.find((r) => String(r.id) === String(id));
+    setForm((f) => ({
+      ...f,
+      recurringItemId: id,
+      ...(item && !editing ? { title: item.title, dueDate: nextOccurrence(item) || '' } : {}),
+    }));
+  };
+
+  const pickProvider = (id) => {
+    const p = providers.find((x) => String(x.id) === String(id));
+    if (p) setForm((f) => ({ ...f, contractorName: p.name, contractorPhone: p.phone || '', status: f.status === 'OPEN' ? 'CONTRACTOR' : f.status }));
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
+    const hasCost = form.cost !== '' && Number(form.cost) >= 0;
+    const payload = {
+      title: form.title,
+      description: form.description,
+      location: form.location,
+      urgency: form.urgency,
+      contractorName: form.contractorName,
+      contractorPhone: form.contractorPhone,
+      cost: hasCost ? Number(form.cost) : null,
+    };
+    if (isCommittee) {
+      Object.assign(payload, {
+        dueDate: form.dueDate || null,
+        paidFrom: hasCost ? form.paidFrom || null : null,
+        showOnTimeline: form.showOnTimeline,
+        recurringItemId: source === 'RECURRING' && form.recurringItemId ? Number(form.recurringItemId) : null,
+        ...(editing ? { status: form.status } : {}),
+      });
+    }
     try {
-      await onSave(cost === '' ? null : Number(cost), cost === '' ? null : paidFrom);
-    } finally {
+      if (editing) await api.updateTask(buildingId, task.id, payload);
+      else await api.createTask(buildingId, payload);
+      await onSaved();
+    } catch (err) {
+      setError(err.message);
       setSaving(false);
     }
   };
 
+  const remove = async () => {
+    await api.deleteTask(buildingId, task.id);
+    await onSaved();
+  };
+
+  const title = editing ? (canEdit ? 'עריכת משימה' : 'פרטי משימה') : isCommittee ? 'משימה או תקלה חדשה' : 'פתיחת תקלה';
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-sm sm:rounded-2xl rounded-t-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800 flex items-center gap-1.5"><Pencil size={16} /> עלות המשימה</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
-        </div>
-        <form onSubmit={submit} className="px-5 py-4 space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">עלות (₪)</label>
-            <input type="number" step="0.01" min="0" value={cost} onChange={(e) => setCost(e.target.value)} className="input" placeholder="השאירו ריק להסרת העלות" />
+    <Sheet title={title} onClose={onClose}>
+      <form onSubmit={submit} className="stack">
+        {editing && task.residentReported && <div className="alert alert--warning row"><Home size={20} /> <span>תקלת דייר{task.reportedByName ? ` - דווחה ע"י ${task.reportedByName}` : ''}</span></div>}
+        {complexTask && <div className="alert alert--warning row"><Network size={20} /> <span>משימת מתחם {task.complexName ? `(${task.complexName}) ` : ''}- מנוהלת מפרופיל המתחם.</span></div>}
+
+        {isCommittee && canEdit && !editing && (
+          <div className="field">
+            <label>מאיפה המשימה?</label>
+            <div className="segmented" style={{ alignSelf: 'flex-start' }}>
+              <button type="button" aria-pressed={source === 'NEW'} onClick={() => { setSource('NEW'); set('recurringItemId', ''); }}>פריט חדש / תקלה</button>
+              <button type="button" aria-pressed={source === 'RECURRING'} onClick={() => setSource('RECURRING')} disabled={recurring.length === 0}>מהרשימה הצפויה</button>
+            </div>
+            {recurring.length === 0 && <span className="text-footnote text-secondary">עוד אין הוצאות צפויות - אפשר להגדיר אותן במסך "הוצאות".</span>}
           </div>
-          {cost !== '' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">שולם / ישולם מתוך</label>
-              <div className="flex gap-2">
-                {PAID_FROM_OPTIONS.map((opt) => (
-                  <button
-                    type="button"
-                    key={opt.value}
-                    onClick={() => setPaidFrom(opt.value)}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
-                      paidFrom === opt.value ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+        )}
+
+        {isCommittee && canEdit && source === 'RECURRING' && (
+          <div className="field">
+            <label>פריט צפוי</label>
+            <select className="input" value={form.recurringItemId} onChange={(e) => pickRecurring(e.target.value)} required>
+              <option value="">בחרו פריט...</option>
+              {recurring.map((r) => <option key={r.id} value={r.id}>{r.title} · {describeSchedule(r)}</option>)}
+            </select>
+            <span className="text-footnote text-secondary">המשימה תקושר לפריט, וההוצאה שלה תירשם תחת אותה קטגוריה.</span>
+          </div>
+        )}
+
+        <div className="field"><label>מה קרה / מה צריך לעשות</label><input className="input" value={form.title} onChange={(e) => set('title', e.target.value)} required disabled={!canEdit} placeholder="לדוגמה: נזילה בחדר המדרגות" /></div>
+        <div className="field"><label>פירוט</label><textarea className="input" rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} disabled={!canEdit} /></div>
+        <div className="field-row">
+          <div className="field"><label>מיקום</label><input className="input" value={form.location} onChange={(e) => set('location', e.target.value)} disabled={!canEdit} placeholder="קומה 2, חניה..." /></div>
+          <div className="field">
+            <label>דחיפות</label>
+            <div className="segmented" style={{ alignSelf: 'flex-start' }}>
+              {['רגיל', 'דחוף'].map((u) => <button type="button" key={u} aria-pressed={form.urgency === u} onClick={() => canEdit && set('urgency', u)}>{u}</button>)}
+            </div>
+          </div>
+        </div>
+
+        {isCommittee && canEdit && (
+          <div className="field-row">
+            <div className="field"><label>תאריך יעד</label><input type="date" className="input" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></div>
+            {editing && (
+              <div className="field">
+                <label>סטטוס</label>
+                <select className="input" value={form.status} onChange={(e) => set('status', e.target.value)}>
+                  {TASK_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
               </div>
+            )}
+          </div>
+        )}
+
+        <div className="stack" style={{ gap: 'var(--space-3)' }}>
+          <h3 style={{ margin: 0 }}>בעל מקצוע ועלות</h3>
+          {canEdit && providers.length > 0 && (
+            <div className="field">
+              <label>מתוך בעלי המקצוע של הבניין</label>
+              <select className="input" defaultValue="" onChange={(e) => pickProvider(e.target.value)}>
+                <option value="">בחרו (לא חובה)...</option>
+                {providers.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.category}</option>)}
+              </select>
             </div>
           )}
-          <p className="text-[11px] text-slate-400">זהו שדה מידע בלבד - הוא לא נרשם אוטומטית בטאב "הוצאות ותנועות".</p>
-          <div className="pt-1 flex gap-2">
-            <button type="submit" disabled={saving} className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition">
-              {saving ? 'שומר...' : 'שמירה'}
-            </button>
-            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">ביטול</button>
+          <div className="field-row">
+            <div className="field"><label>שם בעל המקצוע</label><input className="input" value={form.contractorName} onChange={(e) => set('contractorName', e.target.value)} disabled={!canEdit} /></div>
+            <div className="field"><label>טלפון</label><input className="input" value={form.contractorPhone} onChange={(e) => set('contractorPhone', e.target.value)} disabled={!canEdit} dir="ltr" style={{ textAlign: 'start' }} inputMode="tel" /></div>
           </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function TaskFormModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ title: '', description: '', location: '', urgency: 'רגיל', attachmentUrl: '', dueDate: '', showOnTimeline: true });
-  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800">דיווח תקלה / משימה</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500"><X size={20} /></button>
-        </div>
-        <form onSubmit={(e) => { e.preventDefault(); onSave(form); }} className="overflow-y-auto px-5 py-4 space-y-3 flex-1">
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">כותרת</label>
-            <input value={form.title} onChange={(e) => set('title', e.target.value)} className="input" required />
+          {editing && task.contractorPhone && !canEdit && (
+            <a href={`tel:${task.contractorPhone}`} className="btn btn--secondary btn--small" style={{ alignSelf: 'flex-start' }}><Phone size={16} /> התקשרות</a>
+          )}
+          <div className="field">
+            <label>עלות (₪)</label>
+            <input type="number" min="0" step="0.01" className="input" value={form.cost} onChange={(e) => set('cost', e.target.value)} disabled={!canEdit} inputMode="decimal" />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">תיאור</label>
-            <textarea value={form.description} onChange={(e) => set('description', e.target.value)} className="input" rows={3} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">מיקום</label>
-            <input value={form.location} onChange={(e) => set('location', e.target.value)} className="input" placeholder="קומה 2, לובי, מעלית..." />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">דחיפות</label>
-            <div className="flex gap-2">
-              {['רגיל', 'דחוף'].map((u) => (
-                <button
-                  type="button"
-                  key={u}
-                  onClick={() => set('urgency', u)}
-                  className={`flex-1 rounded-lg border py-2 text-sm font-medium ${
-                    form.urgency === u ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
-                  }`}
-                >
-                  {u}
-                </button>
-              ))}
+          {isCommittee && canEdit && form.cost !== '' && (
+            <div className="field">
+              <label>שולם מתוך</label>
+              <div className="segmented" style={{ alignSelf: 'flex-start' }}>
+                <button type="button" aria-pressed={!form.paidFrom} onClick={() => set('paidFrom', '')}>עוד לא שולם</button>
+                {PAID_FROM_OPTIONS.map((o) => <button type="button" key={o.value} aria-pressed={form.paidFrom === o.value} onClick={() => set('paidFrom', o.value)}>{o.label}</button>)}
+              </div>
+              <span className="text-footnote text-secondary">{form.paidFrom ? 'העלות תירשם אוטומטית גם במסך ההוצאות ותרד מהקופה.' : 'כל עוד לא נבחר מקור תשלום - ההוצאה לא נרשמת בקופה.'}</span>
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">תאריך יעד (אופציונלי)</label>
-            <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="input" />
-          </div>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} />
-            להציג בציר הזמן השנתי
-          </label>
-          <div>
-            <label className="block text-sm font-medium text-slate-600 mb-1">קישור לתמונה / קבלה (אופציונלי)</label>
-            <input value={form.attachmentUrl} onChange={(e) => set('attachmentUrl', e.target.value)} className="input" placeholder="https://..." />
-          </div>
-          <div className="pt-2 flex gap-2">
-            <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition">שמירה</button>
-            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">ביטול</button>
-          </div>
-        </form>
-      </div>
-    </div>
+          )}
+          {!isCommittee && canEdit && <span className="text-footnote text-secondary">העלות מועברת לנציג הוועד, שיאשר אותה וירשום אותה בהוצאות.</span>}
+        </div>
+
+        {isCommittee && canEdit && (
+          <label className="row text-footnote"><input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} /> להציג בציר הזמן השנתי</label>
+        )}
+
+        {error && <div className="alert alert--danger" role="alert">{error}</div>}
+        {canEdit && <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? 'שומר...' : editing ? 'שמירת שינויים' : isCommittee ? 'הוספה' : 'שליחת התקלה'}</button>}
+        {editing && isCommittee && !complexTask && (
+          confirmDelete ? (
+            <button type="button" className="btn btn--danger" onClick={remove}>בטוחים? מחיקה סופית{task.cost && task.paidFrom ? ' (גם ההוצאה שנרשמה)' : ''}</button>
+          ) : (
+            <button type="button" className="btn btn--danger btn--small" style={{ alignSelf: 'center' }} onClick={() => setConfirmDelete(true)}><Trash2 size={16} /> מחיקת המשימה</button>
+          )
+        )}
+      </form>
+    </Sheet>
   );
 }

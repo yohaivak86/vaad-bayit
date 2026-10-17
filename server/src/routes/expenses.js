@@ -18,7 +18,7 @@ const upload = multer({
 const LIST_SELECT = {
   id: true, buildingId: true, date: true, category: true, description: true, supplierName: true,
   amount: true, paidFrom: true, receiptUrl: true, receiptFileName: true, receiptMimeType: true, showOnTimeline: true,
-  createdAt: true, complexExpenseId: true,
+  createdAt: true, complexExpenseId: true, taskId: true, recurringItemId: true,
 };
 
 function buildWhere(buildingId, query) {
@@ -56,13 +56,20 @@ router.get('/summary', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { date, category, description, supplierName, amount, paidFrom, receiptUrl, showOnTimeline } = req.body;
+  const { date, category, description, supplierName, amount, paidFrom, receiptUrl, showOnTimeline, recurringItemId } = req.body;
   if (!date || !category || amount === undefined || !paidFrom) {
     return res.status(400).json({ error: 'date, category, amount and paidFrom are required' });
+  }
+  let linkedRecurring = null;
+  if (recurringItemId) {
+    const item = await prisma.recurringItem.findFirst({ where: { id: Number(recurringItemId), buildingId: req.buildingId } });
+    if (!item) return res.status(404).json({ error: 'ההוצאה החוזרת לא נמצאה' });
+    linkedRecurring = item.id;
   }
   const expense = await prisma.expense.create({
     data: {
       buildingId: req.buildingId,
+      recurringItemId: linkedRecurring,
       date: new Date(date),
       category,
       description: description || null,
@@ -97,6 +104,13 @@ router.put('/:id', async (req, res) => {
     },
     select: LIST_SELECT,
   });
+  // The expense and the task it was posted from describe the same money - keep them in step.
+  if (existing.taskId && (amount !== undefined || paidFrom !== undefined)) {
+    await prisma.task.updateMany({
+      where: { id: existing.taskId },
+      data: { ...(amount !== undefined && { cost: Number(amount) }), ...(paidFrom !== undefined && { paidFrom }) },
+    });
+  }
   res.json(expense);
 });
 
@@ -104,6 +118,9 @@ router.delete('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.expense.findFirst({ where: { id, buildingId: req.buildingId } });
   if (!existing) return res.status(404).json({ error: 'הוצאה לא נמצאה' });
+  if (existing.taskId) {
+    await prisma.task.updateMany({ where: { id: existing.taskId }, data: { cost: null, paidFrom: null } });
+  }
   await prisma.expense.delete({ where: { id } });
   res.status(204).end();
 });

@@ -1,123 +1,110 @@
 import { useState } from 'react';
-import { X, Paperclip } from 'lucide-react';
+import { Paperclip, Link2 } from 'lucide-react';
 import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../constants';
+import Sheet from './Sheet';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export default function AddExpenseModal({ onClose, onSave }) {
+const KINDS = [
+  { value: 'ONE_TIME', label: 'חד־פעמית' },
+  { value: 'MONTHLY', label: 'חודשית' },
+  { value: 'ANNUAL', label: 'שנתית' },
+];
+
+// Add a new expense - or edit an existing one (`expense`; committee reps can edit any expense at any
+// time, including the ones a task posted). `prefill` fills a new expense from an expected item.
+export default function AddExpenseModal({ expense, prefill, onClose, onSave }) {
+  const editing = Boolean(expense);
   const [form, setForm] = useState({
-    date: today(),
-    category: EXPENSE_CATEGORIES[0],
-    description: '',
-    supplierName: '',
-    amount: '',
-    paidFrom: 'BANK',
-    receiptUrl: '',
-    showOnTimeline: false,
+    date: expense ? String(expense.date).slice(0, 10) : today(),
+    category: expense?.category || prefill?.category || EXPENSE_CATEGORIES[0],
+    description: expense?.description ?? prefill?.title ?? '',
+    supplierName: expense?.supplierName ?? '',
+    amount: expense ? String(Number(expense.amount)) : prefill?.expectedAmount != null ? String(prefill.expectedAmount) : '',
+    paidFrom: expense?.paidFrom || 'BANK',
+    receiptUrl: expense?.receiptUrl ?? '',
+    showOnTimeline: expense?.showOnTimeline ?? false,
+    kind: 'ONE_TIME',
+    recurringItemId: prefill?.id ?? expense?.recurringItemId ?? null,
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const categories = EXPENSE_CATEGORIES.includes(form.category) ? EXPENSE_CATEGORIES : [form.category, ...EXPENSE_CATEGORIES];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.amount || Number(form.amount) <= 0) return;
+    if (!form.amount || Number(form.amount) <= 0) { setError('יש להזין סכום גדול מאפס.'); return; }
     setSaving(true);
+    setError('');
     try {
       await onSave({ ...form, amount: Number(form.amount) }, receiptFile);
-    } finally {
+    } catch (err) {
+      setError(err.message);
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800">רישום הוצאה</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
-            <X size={20} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-5 py-4 space-y-3 flex-1">
-          <Field label="תאריך">
-            <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className="input" required />
-          </Field>
-          <Field label="קטגוריה">
-            <select value={form.category} onChange={(e) => set('category', e.target.value)} className="input">
-              {EXPENSE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="ספק">
-            <input value={form.supplierName} onChange={(e) => set('supplierName', e.target.value)} className="input" placeholder="שם הספק" />
-          </Field>
-          <Field label="תיאור">
-            <input value={form.description} onChange={(e) => set('description', e.target.value)} className="input" placeholder="פירוט ההוצאה" />
-          </Field>
-          <Field label="סכום (₪)">
-            <input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="input" required />
-          </Field>
-          <Field label="שולם מתוך">
-            <div className="flex gap-2">
-              {PAID_FROM_OPTIONS.map((opt) => (
-                <button
-                  type="button"
-                  key={opt.value}
-                  onClick={() => set('paidFrom', opt.value)}
-                  className={`flex-1 rounded-lg border py-2 text-sm font-medium transition ${
-                    form.paidFrom === opt.value ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 text-slate-600'
-                  }`}
-                >
-                  {opt.label}
-                </button>
+    <Sheet title={editing ? 'עריכת הוצאה' : prefill ? `רישום תשלום: ${prefill.title}` : 'הוצאה חדשה'} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="stack">
+        {editing && expense.taskId && (
+          <div className="alert alert--warning row"><Link2 size={20} /> <span>הוצאה זו נרשמה ממשימה. שינוי הסכום או מקור התשלום יתעדכן גם במשימה.</span></div>
+        )}
+        {!editing && !prefill && (
+          <div className="field">
+            <label>סוג ההוצאה</label>
+            <div className="segmented" style={{ alignSelf: 'flex-start' }}>
+              {KINDS.map((k) => (
+                <button type="button" key={k.value} aria-pressed={form.kind === k.value} onClick={() => set('kind', k.value)}>{k.label}</button>
               ))}
             </div>
-          </Field>
-          <Field label="קבלה (אופציונלי)">
-            <label className="flex items-center gap-2 border border-dashed border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-500 cursor-pointer hover:bg-slate-50">
-              <Paperclip size={16} />
-              {receiptFile ? receiptFile.name : 'העלאת תמונה או PDF של הקבלה'}
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                className="hidden"
-                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
-              />
-            </label>
-          </Field>
-          <Field label="או קישור לקבלה (אופציונלי)">
-            <input value={form.receiptUrl} onChange={(e) => set('receiptUrl', e.target.value)} className="input" placeholder="https://..." />
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} />
-            להציג את ההוצאה בציר הזמן השנתי
-          </label>
-
-          <div className="pt-2 flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white font-semibold rounded-lg py-2.5 text-sm transition"
-            >
-              {saving ? 'שומר...' : 'שמירת הוצאה'}
-            </button>
-            <button type="button" onClick={onClose} className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">
-              ביטול
-            </button>
+            {form.kind !== 'ONE_TIME' && (
+              <span className="text-footnote text-secondary">
+                {form.kind === 'MONTHLY' ? 'תירשם עכשיו, וגם תופיע ברשימת ההוצאות הצפויות בכל חודש.' : 'תירשם עכשיו, וגם תופיע ברשימת ההוצאות הצפויות בכל שנה, באותו חודש.'}
+              </span>
+            )}
           </div>
-        </form>
-      </div>
-    </div>
-  );
-}
+        )}
 
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-slate-600 mb-1">{label}</label>
-      {children}
-    </div>
+        <div className="field-row">
+          <div className="field"><label>תאריך</label><input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} className="input" required /></div>
+          <div className="field"><label>סכום (₪)</label><input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => set('amount', e.target.value)} className="input" required inputMode="decimal" /></div>
+        </div>
+        <div className="field-row">
+          <div className="field">
+            <label>קטגוריה</label>
+            <select value={form.category} onChange={(e) => set('category', e.target.value)} className="input">
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="field"><label>ספק</label><input value={form.supplierName} onChange={(e) => set('supplierName', e.target.value)} className="input" placeholder="שם הספק" /></div>
+        </div>
+        <div className="field"><label>תיאור</label><input value={form.description} onChange={(e) => set('description', e.target.value)} className="input" placeholder="פירוט ההוצאה" /></div>
+
+        <div className="field">
+          <label>שולם מתוך</label>
+          <div className="segmented" style={{ alignSelf: 'flex-start' }}>
+            {PAID_FROM_OPTIONS.map((opt) => (
+              <button type="button" key={opt.value} aria-pressed={form.paidFrom === opt.value} onClick={() => set('paidFrom', opt.value)}>{opt.label}</button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <label>קבלה (לא חובה)</label>
+          <label className="btn btn--secondary" style={{ cursor: 'pointer' }}>
+            <Paperclip size={20} /> {receiptFile ? receiptFile.name : expense?.receiptFileName ? 'החלפת הקבלה' : 'צירוף תמונה או PDF'}
+            <input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} />
+          </label>
+        </div>
+        <div className="field"><label>או קישור לקבלה</label><input value={form.receiptUrl} onChange={(e) => set('receiptUrl', e.target.value)} className="input" placeholder="https://..." dir="ltr" style={{ textAlign: 'start' }} /></div>
+        <label className="row text-footnote"><input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} /> להציג בציר הזמן השנתי</label>
+
+        {error && <div className="alert alert--danger" role="alert">{error}</div>}
+        <button type="submit" disabled={saving} className="btn btn--primary">{saving ? 'שומר...' : editing ? 'שמירת שינויים' : 'שמירת הוצאה'}</button>
+      </form>
+    </Sheet>
   );
 }

@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Building2, Network, Phone, Mail, Plus, Pencil, Link2, Unlink, Users, Layers, ArrowUpDown } from 'lucide-react';
+import { Building2, Network, Phone, Mail, Plus, Pencil, Unlink, Users, Layers, ArrowUpDown } from 'lucide-react';
 import { api } from '../../api';
 import ServiceMap from '../ServiceMap';
 import ProviderFormModal from '../ProviderFormModal';
+import ComplexPicker from '../ComplexPicker';
 
 // Building profile: open to every role, editable only by committee reps / the site admin.
 export default function BuildingProfile({ buildingId, canEdit, onChanged, onOpenComplex }) {
   const [profile, setProfile] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [editing, setEditing] = useState(null); // null | 'new' | provider
-  const [joinCode, setJoinCode] = useState('');
-  const [error, setError] = useState('');
 
   const load = async () => setProfile(await api.getBuildingProfile(buildingId));
   useEffect(() => { load(); }, [buildingId]);
@@ -19,19 +18,6 @@ export default function BuildingProfile({ buildingId, canEdit, onChanged, onOpen
 
   const { building, complex, providers, residentsCount } = profile;
   const selected = providers.find((p) => p.id === selectedId);
-
-  const joinComplex = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      await api.joinComplexFromBuilding(buildingId, joinCode);
-      setJoinCode('');
-      await load();
-      onChanged?.();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
 
   const leaveComplex = async () => {
     if (!confirm(`להסיר את הבניין מהמתחם "${complex.name}"? נותני השירות והמשימות של המתחם יפסיקו להופיע כאן.`)) return;
@@ -43,7 +29,7 @@ export default function BuildingProfile({ buildingId, canEdit, onChanged, onOpen
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 pb-24 lg:p-6">
       <div className="card flex flex-wrap items-center gap-4 p-5">
-        <div className="rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 p-3.5 text-white shadow-lg"><Building2 size={26} /></div>
+        <div className="chip chip--accent" style={{ width: 52, height: 52, padding: 0, justifyContent: 'center' }}><Building2 size={26} /></div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-extrabold text-slate-800">{building.name}</h2>
           <p className="text-sm text-slate-500">{building.address || 'ללא כתובת'}</p>
@@ -61,13 +47,13 @@ export default function BuildingProfile({ buildingId, canEdit, onChanged, onOpen
         {complex ? (
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-violet-700">הבניין משתייך למתחם "{complex.name}"</p>
+              <p className="text-sm font-semibold text-violet-700">הבניין משתייך למתחם {complex.number} · "{complex.name}"</p>
               <p className="mt-0.5 text-xs text-slate-500">
                 בניינים במתחם: {complex.buildings.map((b) => b.name).join(' · ')}
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => onOpenComplex?.()} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white" style={{ backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,.2), transparent 55%)' }}>
+              <button onClick={() => onOpenComplex?.()} className="flex items-center gap-1.5 rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white">
                 <Network size={15} /> לפרופיל המתחם
               </button>
               {canEdit && (
@@ -78,23 +64,9 @@ export default function BuildingProfile({ buildingId, canEdit, onChanged, onOpen
             </div>
           </div>
         ) : (
-          <div>
-            <p className="mb-3 text-sm text-slate-500">הבניין כרגע בודד (לא שייך למתחם). אפשר לשייך אותו למתחם בכל שלב.</p>
-            {canEdit && (
-              <form onSubmit={joinComplex} className="flex flex-wrap gap-2">
-                <input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  className="input max-w-[220px] text-center font-mono tracking-widest"
-                  placeholder="קוד הזמנה למתחם"
-                  required
-                />
-                <button type="submit" className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
-                  <Link2 size={15} /> שיוך למתחם
-                </button>
-              </form>
-            )}
-            {error && <p className="mt-2 text-xs text-rose-600">{error}</p>}
+          <div className="stack" style={{ gap: 'var(--space-3)' }}>
+            <p className="text-footnote text-secondary" style={{ margin: 0 }}>הבניין כרגע בודד (לא שייך למתחם). אפשר לחפש מתחם ולבקש להצטרף אליו - מנהל המתחם יאשר.</p>
+            {canEdit && <ComplexPicker buildingId={buildingId} onChanged={async () => { await load(); onChanged?.(); }} />}
           </div>
         )}
       </div>
@@ -178,7 +150,7 @@ function Stat({ icon: Icon, label }) {
 
 export function ProviderDetails({ provider, canEdit, onEdit, extra }) {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-white p-4 ring-1 ring-slate-200">
+    <div className="rounded-2xl bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-base font-extrabold text-slate-800">{provider.name}</p>

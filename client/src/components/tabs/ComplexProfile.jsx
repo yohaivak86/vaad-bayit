@@ -37,10 +37,10 @@ export default function ComplexProfile({ complexId, currentBuildingId, canFinanc
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-4 pb-24 lg:p-6">
       <div className="card flex flex-wrap items-center gap-4 p-5">
-        <div className="rounded-2xl bg-gradient-to-br from-violet-500 to-purple-700 p-3.5 text-white shadow-lg"><Network size={26} /></div>
+        <div className="chip chip--accent" style={{ width: 52, height: 52, padding: 0, justifyContent: 'center' }}><Network size={26} /></div>
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-xl font-extrabold text-slate-800">מתחם {complex.name}</h2>
-          <p className="text-sm text-slate-500">{buildings.length} בניינים · בעלי המתחם: {complex.ownerName}</p>
+          <h2 className="truncate text-xl font-extrabold text-slate-800">מתחם {complex.number} · {complex.name}</h2>
+          <p className="text-sm text-slate-500">{complex.address ? complex.address + ' · ' : ''}{buildings.length} בניינים · מנהל המתחם: {complex.ownerName}</p>
         </div>
         {canFinance && (
           <button onClick={onOpenFinance} className="flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white">
