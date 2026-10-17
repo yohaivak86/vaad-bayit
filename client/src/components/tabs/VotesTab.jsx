@@ -48,7 +48,16 @@ export default function VotesTab({ buildingId, isCommittee }) {
       {data?.canVote && <p className="page-sub" style={{ margin: 0 }}>מצביעים מדירה {data.apartmentNumber}. לכל דירה קול אחד, גם אם גרים בה כמה דיירים.</p>}
       {error && <div className="alert alert--danger" role="alert">{error}</div>}
       {data === null && <p className="empty">טוען...</p>}
-      {data && data.polls.length === 0 && <div className="card empty">אין עדיין הצבעות. {isCommittee ? 'אפשר לפתוח הצבעה חדשה לדיירי הבניין.' : ''}</div>}
+      {data && data.polls.length === 0 && (
+        <div className="card empty stack" style={{ alignItems: 'center' }}>
+          <p style={{ margin: 0 }}>אין עדיין הצבעות.</p>
+          {isCommittee ? (
+            <button className="btn btn--primary" onClick={() => setShowCreate(true)}><Plus size={20} /> פתיחת הצבעה לדיירי הבניין</button>
+          ) : (
+            <p className="text-footnote" style={{ margin: 0 }}>רק נציג ועד יכול לפתוח הצבעה.</p>
+          )}
+        </div>
+      )}
 
       {data?.polls.map((poll) => {
         const open = poll.status === 'OPEN';
