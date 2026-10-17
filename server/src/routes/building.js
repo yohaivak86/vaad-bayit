@@ -3,16 +3,28 @@ const prisma = require('../lib/prisma');
 const { getBuilding, getBalance } = require('../lib/calc');
 const { hashPassword } = require('../lib/auth');
 const { generateInviteCode } = require('../lib/inviteCode');
+const { requireCommittee, normalizeBuildingRole } = require('../middleware/auth');
 
 const router = express.Router({ mergeParams: true });
 
+const PUBLIC_BUILDING_FIELDS = ['id', 'name', 'address', 'floors', 'apartmentsCount', 'elevatorsCount', 'isConfigured', 'createdAt'];
+
+// Full record for committee reps; identity-only (no balances, no invite code) for residents.
 router.get('/', async (req, res) => {
   const building = await getBuilding(req.buildingId);
   if (!building) return res.status(404).json({ error: 'בניין לא נמצא' });
-  res.json(building);
+
+  const member = await prisma.complexMember.findUnique({
+    where: { buildingId: req.buildingId },
+    include: { complex: { select: { name: true } } },
+  });
+  const complexInfo = { complexId: member?.complexId ?? null, complexName: member?.complex?.name ?? null };
+
+  if (req.buildingRole === 'COMMITTEE') return res.json({ ...building, ...complexInfo });
+  res.json({ ...Object.fromEntries(PUBLIC_BUILDING_FIELDS.map((k) => [k, building[k]])), ...complexInfo });
 });
 
-router.put('/', async (req, res) => {
+router.put('/', requireCommittee, async (req, res) => {
   const {
     name, address, floors, apartmentsCount, monthlyFeeDefault,
     openingBalanceCash, openingBalanceBank, openingBalancePaybox, openingBalanceDate,
@@ -41,13 +53,13 @@ router.put('/', async (req, res) => {
   res.json(updated);
 });
 
-router.get('/balance', async (req, res) => {
+router.get('/balance', requireCommittee, async (req, res) => {
   const balance = await getBalance(req.buildingId);
   res.json(balance);
 });
 
 // Invalidates the current invite code (e.g. if it leaked) and issues a fresh one.
-router.post('/invite-code/regenerate', async (req, res) => {
+router.post('/invite-code/regenerate', requireCommittee, async (req, res) => {
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const updated = await prisma.building.update({
@@ -62,23 +74,77 @@ router.post('/invite-code/regenerate', async (req, res) => {
   res.status(500).json({ error: 'לא הצלחנו ליצור קוד הזמנה, נסו שוב' });
 });
 
-const VALID_ROLES = ['ADMIN', 'VIEWER'];
+// A building starts standalone or inside a complex - and can be moved at any time.
+router.post('/complex/join', requireCommittee, async (req, res) => {
+  const { inviteCode } = req.body;
+  if (!inviteCode) return res.status(400).json({ error: 'inviteCode הוא שדה חובה' });
 
-// Co-admins/viewers of this specific building (a committee typically has more than one member),
-// including anyone who joined with the invite code and is still awaiting approval.
+  const complex = await prisma.complex.findUnique({ where: { inviteCode: inviteCode.toUpperCase().trim() } });
+  if (!complex) return res.status(404).json({ error: 'קוד ההזמנה למתחם לא תקין' });
+
+  try {
+    await prisma.complexMember.create({ data: { complexId: complex.id, buildingId: req.buildingId } });
+  } catch (err) {
+    if (err.code === 'P2002') return res.status(409).json({ error: 'הבניין כבר משויך למתחם - יש להסיר אותו ממנו קודם' });
+    throw err;
+  }
+  res.status(201).json({ complexId: complex.id, complexName: complex.name });
+});
+
+router.post('/complex/leave', requireCommittee, async (req, res) => {
+  await prisma.$transaction([
+    // The complex's providers stop serving this building too.
+    prisma.serviceProviderLink.deleteMany({ where: { buildingId: req.buildingId, provider: { complexId: { not: null } } } }),
+    prisma.complexMember.deleteMany({ where: { buildingId: req.buildingId } }),
+  ]);
+  res.status(204).end();
+});
+
+const VALID_ROLES = ['COMMITTEE', 'RESIDENT'];
+
+// ---- Members of this building (committee reps and residents) ----
+// Granting COMMITTEE is allowed to a site admin or a committee rep of this building - every route
+// below is already behind requireCommittee. (Making someone a *site* admin is separate: it only
+// exists in the site admin's control center.)
+router.use('/admins', requireCommittee);
+
 router.get('/admins', async (req, res) => {
   const memberships = await prisma.buildingAdmin.findMany({
     where: { buildingId: req.buildingId },
     include: { user: true },
     orderBy: { createdAt: 'asc' },
   });
-  res.json(memberships.map((m) => ({ userId: m.user.id, name: m.user.name, email: m.user.email, role: m.role, status: m.status })));
+  const linkedTenants = await prisma.tenant.findMany({
+    where: { buildingId: req.buildingId, userId: { in: memberships.map((m) => m.userId) } },
+    select: { id: true, userId: true, apartmentNumber: true, name: true },
+  });
+  const tenantByUser = new Map(linkedTenants.map((t) => [t.userId, t]));
+
+  res.json(
+    memberships.map((m) => ({
+      userId: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+      phone: m.user.phone,
+      role: normalizeBuildingRole(m.role),
+      status: m.status,
+      tenant: tenantByUser.get(m.userId) || null,
+    }))
+  );
 });
 
+async function linkTenant(buildingId, userId, tenantId) {
+  await prisma.tenant.updateMany({ where: { buildingId, userId }, data: { userId: null } });
+  if (!tenantId) return;
+  const tenant = await prisma.tenant.findFirst({ where: { id: Number(tenantId), buildingId } });
+  if (!tenant) throw Object.assign(new Error('הדירה לא נמצאה'), { status: 404 });
+  await prisma.tenant.update({ where: { id: tenant.id }, data: { userId } });
+}
+
 router.post('/admins', async (req, res) => {
-  const { email, name, password, role } = req.body;
+  const { email, name, password, role, tenantId } = req.body;
   if (!email || !name) return res.status(400).json({ error: 'email ו-name הם שדות חובה' });
-  const membershipRole = role && VALID_ROLES.includes(role) ? role : 'ADMIN';
+  const membershipRole = VALID_ROLES.includes(role) ? role : 'RESIDENT';
 
   const normalizedEmail = email.toLowerCase();
   let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
@@ -97,34 +163,58 @@ router.post('/admins', async (req, res) => {
   });
   if (existingMembership) return res.status(409).json({ error: 'המשתמש כבר משויך לבניין הזה' });
 
-  // An existing admin is adding this user directly, which is itself the approval step.
-  await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId, role: membershipRole, status: 'ACTIVE' } });
+  try {
+    // A committee rep is adding this user directly, which is itself the approval step.
+    await prisma.buildingAdmin.create({ data: { userId: user.id, buildingId: req.buildingId, role: membershipRole, status: 'ACTIVE' } });
+    if (tenantId) await linkTenant(req.buildingId, user.id, tenantId);
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
   res.status(201).json({ userId: user.id, name: user.name, email: user.email, role: membershipRole, status: 'ACTIVE' });
 });
 
-// Approves a PENDING join request (from the invite-code flow) and assigns its role.
+// Approves a PENDING join request (invite-code flow): picks the role and, for a resident,
+// the apartment they belong to.
 router.post('/admins/:userId/approve', async (req, res) => {
   const userId = Number(req.params.userId);
-  const { role } = req.body;
-  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות ADMIN או VIEWER' });
+  const { role, tenantId } = req.body;
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות COMMITTEE או RESIDENT' });
 
-  const updated = await prisma.buildingAdmin.update({
-    where: { userId_buildingId: { userId, buildingId: req.buildingId } },
-    data: { role, status: 'ACTIVE' },
-  });
-  res.json({ userId, role: updated.role, status: updated.status });
+  try {
+    const updated = await prisma.buildingAdmin.update({
+      where: { userId_buildingId: { userId, buildingId: req.buildingId } },
+      data: { role, status: 'ACTIVE' },
+    });
+    if (tenantId) await linkTenant(req.buildingId, userId, tenantId);
+    res.json({ userId, role: updated.role, status: updated.status });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+});
+
+router.put('/admins/:userId/tenant', async (req, res) => {
+  const userId = Number(req.params.userId);
+  try {
+    await linkTenant(req.buildingId, userId, req.body.tenantId || null);
+    res.json({ ok: true });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
 });
 
 router.put('/admins/:userId', async (req, res) => {
   const userId = Number(req.params.userId);
   const { role } = req.body;
-  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות ADMIN או VIEWER' });
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: 'role חייב להיות COMMITTEE או RESIDENT' });
 
-  if (role === 'VIEWER') {
-    const remainingAdmins = await prisma.buildingAdmin.count({
-      where: { buildingId: req.buildingId, role: 'ADMIN', status: 'ACTIVE', userId: { not: userId } },
+  if (role === 'RESIDENT') {
+    const remaining = await prisma.buildingAdmin.count({
+      where: { buildingId: req.buildingId, role: { in: ['COMMITTEE', 'ADMIN'] }, status: 'ACTIVE', userId: { not: userId } },
     });
-    if (remainingAdmins === 0) return res.status(400).json({ error: 'לא ניתן להשאיר את הבניין ללא אף אדמין עם הרשאת עריכה' });
+    if (remaining === 0) return res.status(400).json({ error: 'לא ניתן להשאיר את הבניין ללא נציג ועד' });
   }
 
   const updated = await prisma.buildingAdmin.update({
@@ -140,13 +230,14 @@ router.delete('/admins/:userId', async (req, res) => {
   const target = await prisma.buildingAdmin.findUnique({ where: { userId_buildingId: { userId, buildingId: req.buildingId } } });
   if (!target) return res.status(404).json({ error: 'המשתמש לא נמצא' });
 
-  if (target.status === 'ACTIVE' && target.role === 'ADMIN') {
-    const remainingAdmins = await prisma.buildingAdmin.count({
-      where: { buildingId: req.buildingId, role: 'ADMIN', status: 'ACTIVE', userId: { not: userId } },
+  if (target.status === 'ACTIVE' && normalizeBuildingRole(target.role) === 'COMMITTEE') {
+    const remaining = await prisma.buildingAdmin.count({
+      where: { buildingId: req.buildingId, role: { in: ['COMMITTEE', 'ADMIN'] }, status: 'ACTIVE', userId: { not: userId } },
     });
-    if (remainingAdmins === 0) return res.status(400).json({ error: 'לא ניתן להסיר את האדמין האחרון של הבניין' });
+    if (remaining === 0) return res.status(400).json({ error: 'לא ניתן להסיר את נציג הוועד האחרון של הבניין' });
   }
 
+  await prisma.tenant.updateMany({ where: { buildingId: req.buildingId, userId }, data: { userId: null } });
   await prisma.buildingAdmin.delete({ where: { userId_buildingId: { userId, buildingId: req.buildingId } } });
   res.status(204).end();
 });

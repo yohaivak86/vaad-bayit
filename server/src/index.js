@@ -4,7 +4,11 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const { requireAuth, requireBuildingAccess, blockViewerWrites, requireAdminRole } = require('./middleware/auth');
+const { requireAuth, requireBuildingAccess, blockResidentWrites, requireCommittee } = require('./middleware/auth');
+const meRoutes = require('./routes/me');
+const timelineRoutes = require('./routes/timeline');
+const providersRoutes = require('./routes/providers');
+const profileRoutes = require('./routes/profile');
 const authRoutes = require('./routes/auth');
 const buildingsListRoutes = require('./routes/buildings');
 const buildingRoutes = require('./routes/building');
@@ -43,17 +47,24 @@ app.use('/api/admin', adminRoutes);
 // the caller to be authenticated and to have access to that specific building.
 const buildingScope = express.Router({ mergeParams: true });
 buildingScope.use('/', buildingRoutes);
-// Per-apartment payment status/debts is sensitive - fully hidden from VIEWERs, not just read-only.
-buildingScope.use('/tenants', requireAdminRole, tenantsRoutes);
-buildingScope.use('/dues', requireAdminRole, duesRoutes);
+// Open to every role: a resident's own page, the year timeline, the building/complex profile
+// and the tasks (building + complex). Residents can read these but never change them (apart
+// from /me, see blockResidentWrites).
+buildingScope.use('/me', meRoutes);
+buildingScope.use('/timeline', timelineRoutes);
+buildingScope.use('/profile', profileRoutes);
+buildingScope.use('/providers', providersRoutes);
 buildingScope.use('/tasks', tasksRoutes);
-buildingScope.use('/expenses', expensesRoutes);
-buildingScope.use('/budget', budgetRoutes);
-buildingScope.use('/minutes', minutesRoutes);
-buildingScope.use('/procedures', proceduresRoutes);
 buildingScope.use('/announcements', announcementsRoutes);
+// Everything about other residents or money: committee reps (and the site admin) only.
+buildingScope.use('/tenants', requireCommittee, tenantsRoutes);
+buildingScope.use('/dues', requireCommittee, duesRoutes);
+buildingScope.use('/expenses', requireCommittee, expensesRoutes);
+buildingScope.use('/budget', requireCommittee, budgetRoutes);
+buildingScope.use('/minutes', requireCommittee, minutesRoutes);
+buildingScope.use('/procedures', requireCommittee, proceduresRoutes);
 
-app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, blockViewerWrites, buildingScope);
+app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, blockResidentWrites, buildingScope);
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 

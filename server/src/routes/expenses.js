@@ -17,7 +17,7 @@ const upload = multer({
 // Listing/summary never returns the receipt bytes - just enough to know one exists.
 const LIST_SELECT = {
   id: true, buildingId: true, date: true, category: true, description: true, supplierName: true,
-  amount: true, paidFrom: true, receiptUrl: true, receiptFileName: true, receiptMimeType: true,
+  amount: true, paidFrom: true, receiptUrl: true, receiptFileName: true, receiptMimeType: true, showOnTimeline: true,
   createdAt: true, complexExpenseId: true,
 };
 
@@ -56,7 +56,7 @@ router.get('/summary', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { date, category, description, supplierName, amount, paidFrom, receiptUrl } = req.body;
+  const { date, category, description, supplierName, amount, paidFrom, receiptUrl, showOnTimeline } = req.body;
   if (!date || !category || amount === undefined || !paidFrom) {
     return res.status(400).json({ error: 'date, category, amount and paidFrom are required' });
   }
@@ -70,6 +70,7 @@ router.post('/', async (req, res) => {
       amount: Number(amount),
       paidFrom,
       receiptUrl: receiptUrl || null,
+      showOnTimeline: Boolean(showOnTimeline),
     },
     select: LIST_SELECT,
   });
@@ -81,7 +82,7 @@ router.put('/:id', async (req, res) => {
   const existing = await prisma.expense.findFirst({ where: { id, buildingId: req.buildingId } });
   if (!existing) return res.status(404).json({ error: 'הוצאה לא נמצאה' });
 
-  const { date, category, description, supplierName, amount, paidFrom, receiptUrl } = req.body;
+  const { date, category, description, supplierName, amount, paidFrom, receiptUrl, showOnTimeline } = req.body;
   const expense = await prisma.expense.update({
     where: { id },
     data: {
@@ -92,6 +93,7 @@ router.put('/:id', async (req, res) => {
       ...(amount !== undefined && { amount: Number(amount) }),
       ...(paidFrom !== undefined && { paidFrom }),
       ...(receiptUrl !== undefined && { receiptUrl }),
+      ...(showOnTimeline !== undefined && { showOnTimeline: Boolean(showOnTimeline) }),
     },
     select: LIST_SELECT,
   });

@@ -27,12 +27,26 @@ function publicComplex(complex, { includeInviteCode }) {
   };
 }
 
-// Buildings the requester administers directly (used to check complex access/actions).
-async function myBuildingIds(user) {
+// Buildings the requester belongs to in any role (a resident included) - enough to open the
+// complex profile and its tasks. A site admin counts as belonging to all of them.
+async function viewerBuildingIds(user) {
   if (user.role === 'SUPER_ADMIN') {
     return (await prisma.building.findMany({ select: { id: true } })).map((b) => b.id);
   }
-  const memberships = await prisma.buildingAdmin.findMany({ where: { userId: user.id }, select: { buildingId: true } });
+  const memberships = await prisma.buildingAdmin.findMany({ where: { userId: user.id, status: 'ACTIVE' }, select: { buildingId: true } });
+  return memberships.map((m) => m.buildingId);
+}
+
+// Buildings where the requester is a committee rep (נציג ועד) - needed for anything financial
+// (shares, shared expenses, the electricity meter) and for joining/leaving a complex.
+async function committeeBuildingIds(user) {
+  if (user.role === 'SUPER_ADMIN') {
+    return (await prisma.building.findMany({ select: { id: true } })).map((b) => b.id);
+  }
+  const memberships = await prisma.buildingAdmin.findMany({
+    where: { userId: user.id, status: 'ACTIVE', role: { in: ['COMMITTEE', 'ADMIN'] } },
+    select: { buildingId: true },
+  });
   return memberships.map((m) => m.buildingId);
 }
 
@@ -54,7 +68,7 @@ function isOwner(complex, user) {
 
 // Complexes the user can see: ones they own, or ones any of their buildings belongs to.
 router.get('/mine', async (req, res) => {
-  const buildingIds = await myBuildingIds(req.user);
+  const buildingIds = await viewerBuildingIds(req.user);
   const complexes = await prisma.complex.findMany({
     where: { OR: [{ ownerId: req.user.id }, { members: { some: { buildingId: { in: buildingIds } } } }] },
     include: { owner: true, members: { include: { building: true } } },
@@ -66,6 +80,9 @@ router.get('/mine', async (req, res) => {
 router.post('/', async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: 'name הוא שדה חובה' });
+  if ((await committeeBuildingIds(req.user)).length === 0) {
+    return res.status(403).json({ error: 'רק מנהל אתר או נציג ועד יכולים ליצור מתחם' });
+  }
 
   const complex = await prisma.complex.create({
     data: { name, ownerId: req.user.id, inviteCode: generateInviteCode() },
@@ -78,7 +95,7 @@ router.get('/:id', async (req, res) => {
   const complex = await loadComplexOr404(Number(req.params.id), res);
   if (!complex) return;
 
-  const buildingIds = await myBuildingIds(req.user);
+  const buildingIds = await committeeBuildingIds(req.user);
   const isMember = complex.members.some((m) => buildingIds.includes(m.buildingId));
   if (!isOwner(complex, req.user) && !isMember) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
 
@@ -94,8 +111,8 @@ router.post('/join', async (req, res) => {
   const complex = await prisma.complex.findUnique({ where: { inviteCode: inviteCode.toUpperCase().trim() } });
   if (!complex) return res.status(404).json({ error: 'קוד ההזמנה לא תקין' });
 
-  const buildingIds = await myBuildingIds(req.user);
-  if (!buildingIds.includes(Number(buildingId))) return res.status(403).json({ error: 'אין הרשאה לבניין זה' });
+  const buildingIds = await committeeBuildingIds(req.user);
+  if (!buildingIds.includes(Number(buildingId))) return res.status(403).json({ error: 'רק נציג ועד של הבניין יכול לשייך אותו למתחם' });
 
   try {
     await prisma.complexMember.create({ data: { complexId: complex.id, buildingId: Number(buildingId) } });
@@ -111,7 +128,11 @@ router.delete('/:id/members/:buildingId', async (req, res) => {
   if (!complex) return;
   if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול להסיר בניינים' });
 
-  await prisma.complexMember.deleteMany({ where: { complexId: complex.id, buildingId: Number(req.params.buildingId) } });
+  const buildingId = Number(req.params.buildingId);
+  await prisma.$transaction([
+    prisma.serviceProviderLink.deleteMany({ where: { buildingId, provider: { complexId: complex.id } } }),
+    prisma.complexMember.deleteMany({ where: { complexId: complex.id, buildingId } }),
+  ]);
   res.status(204).end();
 });
 
@@ -171,7 +192,7 @@ router.get('/:id/expenses', async (req, res) => {
   const complex = await loadComplexOr404(Number(req.params.id), res);
   if (!complex) return;
 
-  const buildingIds = await myBuildingIds(req.user);
+  const buildingIds = await committeeBuildingIds(req.user);
   const isMember = complex.members.some((m) => buildingIds.includes(m.buildingId));
   if (!isOwner(complex, req.user) && !isMember) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
 
@@ -262,7 +283,7 @@ router.get('/:id/electricity-readings', async (req, res) => {
   const complex = await loadComplexOr404(Number(req.params.id), res);
   if (!complex) return;
 
-  const buildingIds = await myBuildingIds(req.user);
+  const buildingIds = await committeeBuildingIds(req.user);
   const isMember = complex.members.some((m) => buildingIds.includes(m.buildingId));
   if (!isOwner(complex, req.user) && !isMember) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
 
@@ -367,6 +388,184 @@ router.post('/:id/electricity-debts/:debtId/mark-paid', async (req, res) => {
     data: { paid: true, paidAt: new Date() },
   });
   res.json({ id: updated.id, paid: updated.paid, paidAt: updated.paidAt });
+});
+
+// ---- Complex profile, tasks and service providers ----
+// Reading is open to everyone who belongs to a member building (residents included); changing
+// anything is for the complex owner / site admin only.
+
+async function canViewComplex(complex, user) {
+  if (isOwner(complex, user)) return true;
+  const ids = await viewerBuildingIds(user);
+  return complex.members.some((m) => ids.includes(m.buildingId));
+}
+
+router.get('/:id/profile', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!(await canViewComplex(complex, req.user))) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
+
+  const providers = await prisma.serviceProvider.findMany({
+    where: { complexId: complex.id },
+    include: { links: true },
+    orderBy: { name: 'asc' },
+  });
+
+  res.json({
+    complex: { id: complex.id, name: complex.name, ownerName: complex.owner?.name },
+    canEdit: isOwner(complex, req.user),
+    buildings: complex.members.map((m) => ({
+      id: m.buildingId,
+      name: m.building.name,
+      address: m.building.address,
+      apartmentsCount: m.building.apartmentsCount,
+    })),
+    providers: providers.map((p) => ({
+      id: p.id,
+      name: p.name,
+      category: p.category,
+      phone: p.phone,
+      email: p.email,
+      notes: p.notes,
+      buildingIds: p.links.map((l) => l.buildingId),
+    })),
+  });
+});
+
+router.get('/:id/tasks', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!(await canViewComplex(complex, req.user))) return res.status(403).json({ error: 'אין הרשאה לצפות במתחם זה' });
+
+  const tasks = await prisma.task.findMany({ where: { complexId: complex.id }, orderBy: { createdAt: 'desc' } });
+  res.json(tasks);
+});
+
+router.post('/:id/tasks', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל משימות מתחמיות' });
+
+  const { title, description, location, urgency, dueDate, showOnTimeline, cost, paidFrom } = req.body;
+  if (!title) return res.status(400).json({ error: 'title הוא שדה חובה' });
+  const hasCost = cost !== undefined && cost !== null && cost !== '';
+  const task = await prisma.task.create({
+    data: {
+      complexId: complex.id,
+      title,
+      description: description || null,
+      location: location || null,
+      urgency: urgency || 'רגיל',
+      dueDate: dueDate ? new Date(dueDate) : null,
+      showOnTimeline: showOnTimeline === undefined ? true : Boolean(showOnTimeline),
+      cost: hasCost ? Number(cost) : null,
+      paidFrom: hasCost ? paidFrom || null : null,
+    },
+  });
+  res.status(201).json(task);
+});
+
+router.put('/:id/tasks/:taskId', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל משימות מתחמיות' });
+
+  const id = Number(req.params.taskId);
+  const existing = await prisma.task.findFirst({ where: { id, complexId: complex.id } });
+  if (!existing) return res.status(404).json({ error: 'משימה לא נמצאה' });
+
+  const { title, description, location, urgency, status, dueDate, showOnTimeline, cost, paidFrom } = req.body;
+  const data = {
+    ...(title !== undefined && { title }),
+    ...(description !== undefined && { description }),
+    ...(location !== undefined && { location }),
+    ...(urgency !== undefined && { urgency }),
+    ...(dueDate !== undefined && { dueDate: dueDate ? new Date(dueDate) : null }),
+    ...(showOnTimeline !== undefined && { showOnTimeline: Boolean(showOnTimeline) }),
+    ...(cost !== undefined && { cost: cost === null || cost === '' ? null : Number(cost) }),
+    ...(paidFrom !== undefined && { paidFrom: paidFrom || null }),
+  };
+  if (status !== undefined) {
+    data.status = status;
+    data.resolvedAt = status === 'RESOLVED' ? new Date() : null;
+  }
+  res.json(await prisma.task.update({ where: { id }, data }));
+});
+
+router.delete('/:id/tasks/:taskId', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל משימות מתחמיות' });
+
+  await prisma.task.deleteMany({ where: { id: Number(req.params.taskId), complexId: complex.id } });
+  res.status(204).end();
+});
+
+router.post('/:id/providers', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל נותני שירות' });
+
+  const { name, category, phone, email, notes, buildingIds } = req.body;
+  if (!name || !category) return res.status(400).json({ error: 'name ו-category הם שדות חובה' });
+
+  const memberIds = complex.members.map((m) => m.buildingId);
+  const linked = (Array.isArray(buildingIds) ? buildingIds : []).map(Number).filter((id) => memberIds.includes(id));
+
+  const provider = await prisma.serviceProvider.create({
+    data: {
+      complexId: complex.id,
+      name,
+      category,
+      phone: phone || null,
+      email: email || null,
+      notes: notes || null,
+      links: { create: linked.map((buildingId) => ({ buildingId })) },
+    },
+  });
+  res.status(201).json(provider);
+});
+
+router.put('/:id/providers/:providerId', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל נותני שירות' });
+
+  const id = Number(req.params.providerId);
+  const existing = await prisma.serviceProvider.findFirst({ where: { id, complexId: complex.id } });
+  if (!existing) return res.status(404).json({ error: 'נותן שירות לא נמצא' });
+
+  const { name, category, phone, email, notes, buildingIds } = req.body;
+  const memberIds = complex.members.map((m) => m.buildingId);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.serviceProvider.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(category !== undefined && { category }),
+        ...(phone !== undefined && { phone: phone || null }),
+        ...(email !== undefined && { email: email || null }),
+        ...(notes !== undefined && { notes: notes || null }),
+      },
+    });
+    // Which of the complex's buildings this provider serves - changeable at any time.
+    if (Array.isArray(buildingIds)) {
+      const linked = buildingIds.map(Number).filter((b) => memberIds.includes(b));
+      await tx.serviceProviderLink.deleteMany({ where: { providerId: id } });
+      if (linked.length) await tx.serviceProviderLink.createMany({ data: linked.map((buildingId) => ({ providerId: id, buildingId })) });
+    }
+  });
+  res.json({ ok: true });
+});
+
+router.delete('/:id/providers/:providerId', async (req, res) => {
+  const complex = await loadComplexOr404(Number(req.params.id), res);
+  if (!complex) return;
+  if (!isOwner(complex, req.user)) return res.status(403).json({ error: 'רק בעל המתחם יכול לנהל נותני שירות' });
+
+  await prisma.serviceProvider.deleteMany({ where: { id: Number(req.params.providerId), complexId: complex.id } });
+  res.status(204).end();
 });
 
 module.exports = router;

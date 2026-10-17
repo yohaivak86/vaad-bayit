@@ -28,8 +28,16 @@ async function createUserAccount(tx, { email, password, name, phone, marketingCo
 
 // Self-service signup: creates a brand-new building together with its first admin.
 router.post('/register', async (req, res) => {
-  const { email, password, name, phone, buildingName, buildingAddress, marketingConsent } = req.body;
+  const { email, password, name, phone, buildingName, buildingAddress, marketingConsent, complexInviteCode } = req.body;
   if (!buildingName) return res.status(400).json({ error: 'buildingName הוא שדה חובה' });
+
+  // Optional: attach the new building to an existing complex right away (it can also be
+  // attached - or detached - later from the building profile).
+  let complex = null;
+  if (complexInviteCode && complexInviteCode.trim()) {
+    complex = await prisma.complex.findUnique({ where: { inviteCode: complexInviteCode.toUpperCase().trim() } });
+    if (!complex) return res.status(404).json({ error: 'קוד ההזמנה למתחם לא תקין' });
+  }
 
   let result;
   try {
@@ -38,7 +46,8 @@ router.post('/register', async (req, res) => {
       const building = await tx.building.create({
         data: { name: buildingName, address: buildingAddress || '', inviteCode: generateInviteCode() },
       });
-      await tx.buildingAdmin.create({ data: { userId: user.id, buildingId: building.id } });
+      await tx.buildingAdmin.create({ data: { userId: user.id, buildingId: building.id, role: 'COMMITTEE' } });
+      if (complex) await tx.complexMember.create({ data: { complexId: complex.id, buildingId: building.id } });
       return { user, building };
     });
   } catch (err) {

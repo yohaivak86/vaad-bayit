@@ -13,6 +13,7 @@ export default function AddExpenseModal({ onClose, onSave }) {
     amount: '',
     paidFrom: 'BANK',
     receiptUrl: '',
+    showOnTimeline: false,
   });
   const [receiptFile, setReceiptFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -89,6 +90,10 @@ export default function AddExpenseModal({ onClose, onSave }) {
           <Field label="או קישור לקבלה (אופציונלי)">
             <input value={form.receiptUrl} onChange={(e) => set('receiptUrl', e.target.value)} className="input" placeholder="https://..." />
           </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} />
+            להציג את ההוצאה בציר הזמן השנתי
+          </label>
 
           <div className="pt-2 flex gap-2">
             <button

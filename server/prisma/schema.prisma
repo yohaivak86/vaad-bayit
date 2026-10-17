@@ -13,12 +13,13 @@ model User {
   passwordHash   String
   name           String
   phone          String?
-  role           String          @default("BUILDING_ADMIN") // SUPER_ADMIN | BUILDING_ADMIN
+  role           String          @default("BUILDING_ADMIN") // SUPER_ADMIN (site admin) | anything else = regular user; per-building access lives in BuildingAdmin.role
   marketingConsent Boolean       @default(false) // optional for building admins, unlike Professional where it's required
   createdAt      DateTime        @default(now())
   buildingAdmins BuildingAdmin[]
   ownedComplexes Complex[]
   suggestions    Suggestion[]
+  tenantLinks    Tenant[]
 }
 
 // A tradesperson/contractor who registered interest in offering services through the
@@ -56,15 +57,15 @@ model Suggestion {
   updatedAt  DateTime  @updatedAt
 }
 
-// Join table: which buildings a BUILDING_ADMIN user manages, and with what access.
-// A SUPER_ADMIN bypasses this table entirely and can access every building.
+// Join table: a user's role inside one building (RESIDENT or COMMITTEE).
+// A SUPER_ADMIN (site admin) bypasses this table entirely and can access every building.
 model BuildingAdmin {
   id         Int      @id @default(autoincrement())
   userId     Int
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   buildingId Int
   building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
-  role       String   @default("ADMIN") // ADMIN (full edit) | VIEWER (read-only) - meaningless while PENDING
+  role       String   @default("RESIDENT") // RESIDENT (default, sees only their own data) | COMMITTEE (נציג ועד, manages the building) - meaningless while PENDING
   status     String   @default("ACTIVE") // ACTIVE | PENDING (self-service invite-code joins wait for an admin to approve)
   createdAt  DateTime @default(now())
 
@@ -102,6 +103,8 @@ model Building {
   announcements   Announcement[]
   suggestions     Suggestion[]
   electricityDebts ComplexElectricityDebt[]
+  providers       ServiceProvider[]
+  providerLinks   ServiceProviderLink[]
 }
 
 model MeetingMinutes {
@@ -151,6 +154,8 @@ model Complex {
   members             ComplexMember[]
   expenses             ComplexExpense[]
   electricityReadings  ComplexElectricityReading[]
+  tasks                Task[]
+  providers            ServiceProvider[]
 }
 
 // A building's membership in a complex, with an optional custom cost-share.
@@ -227,8 +232,12 @@ model Tenant {
   monthlyFee      Decimal? @db.Decimal(10, 2) // overrides building default when set
   active          Boolean  @default(true)
   sortOrder       Int      @default(0) // manual display order, independent of apartmentNumber text
+  userId          Int? // the resident account linked to this apartment (lets them see/edit only their own details)
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   dues            Due[]
+
+  @@unique([buildingId, userId])
 }
 
 model Due {
@@ -248,10 +257,16 @@ model Due {
   @@unique([tenantId, year, month])
 }
 
+// A task belongs to exactly one scope: a single building (buildingId) or a whole complex
+// (complexId) - complex tasks show up on every member building's timeline.
 model Task {
   id              Int       @id @default(autoincrement())
-  buildingId      Int
-  building        Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  buildingId      Int?
+  building        Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  complexId       Int?
+  complex         Complex?  @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  dueDate         DateTime?
+  showOnTimeline  Boolean   @default(true)
   title           String
   description     String?
   location        String?
@@ -281,6 +296,7 @@ model Expense {
   receiptFileName  String?
   receiptMimeType  String?
   receiptData      Bytes?
+  showOnTimeline   Boolean         @default(false)
   createdAt        DateTime        @default(now())
   complexExpenseId Int? // set when this row was auto-generated from a shared ComplexExpense
   complexExpense   ComplexExpense? @relation(fields: [complexExpenseId], references: [id], onDelete: Cascade)
@@ -295,4 +311,32 @@ model BudgetItem {
   frequency  String // MONTHLY | BIMONTHLY | SEMIANNUAL | ANNUAL
   amount     Decimal  @db.Decimal(10, 2)
   months     Int[] // months (1-12) this line applies to
+}
+
+// A service provider (cleaner, elevator technician, gardener...) of a single building or
+// of a whole complex. Complex providers can be linked to a subset of the member buildings.
+model ServiceProvider {
+  id         Int       @id @default(autoincrement())
+  name       String
+  category   String
+  phone      String?
+  email      String?
+  notes      String?
+  buildingId Int?
+  building   Building? @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  complexId  Int?
+  complex    Complex?  @relation(fields: [complexId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+
+  links ServiceProviderLink[]
+}
+
+model ServiceProviderLink {
+  id         Int             @id @default(autoincrement())
+  providerId Int
+  provider   ServiceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  buildingId Int
+  building   Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, buildingId])
 }

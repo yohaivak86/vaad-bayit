@@ -49,3 +49,23 @@ export const BUDGET_FREQUENCIES = [
   { value: 'SEMIANNUAL', label: 'חצי שנתי' },
   { value: 'ANNUAL', label: 'שנתי' },
 ];
+
+// Per-building access levels (the third level, site admin, is a global flag on the user).
+export const ROLE_LABELS = {
+  COMMITTEE: 'נציג ועד',
+  RESIDENT: 'דייר',
+  SITE_ADMIN: 'מנהל אתר',
+};
+
+export const PROVIDER_CATEGORIES = [
+  'ניקיון',
+  'גינון',
+  'מעליות',
+  'חשמל',
+  'אינסטלציה',
+  'הדברה',
+  'אבטחה',
+  'ביטוח',
+  'ניהול / חשבות',
+  'אחר',
+];

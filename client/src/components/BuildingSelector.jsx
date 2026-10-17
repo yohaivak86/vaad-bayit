@@ -34,8 +34,8 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
                 key={b.id}
                 onClick={() => !isPending && onSelect(b.id)}
                 disabled={isPending}
-                className={`w-full flex items-center justify-between bg-white border rounded-xl px-4 py-3.5 transition ${
-                  isPending ? 'border-amber-200 bg-amber-50 cursor-default' : 'border-slate-200 hover:border-blue-300 hover:shadow-sm'
+                className={`w-full flex items-center justify-between rounded-2xl px-4 py-3.5 ${
+                  isPending ? 'border border-amber-200 bg-amber-50 cursor-default' : 'card card-lift'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -47,7 +47,10 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
                     {isPending ? (
                       <p className="text-xs text-amber-700 flex items-center gap-1"><Clock size={11} /> ממתין לאישור מנהל הבניין</p>
                     ) : (
-                      <p className="text-xs text-slate-500">{b.address}</p>
+                      <p className="text-xs text-slate-500">
+                        {b.address}
+                        {b.complexName ? <span className="font-semibold text-violet-600">{b.address ? ' · ' : ''}מתחם {b.complexName}</span> : ''}
+                      </p>
                     )}
                   </div>
                 </div>
@@ -122,7 +125,7 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
 }
 
 function CreateBuildingModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ name: '', address: '', adminEmail: '', adminName: '', adminPassword: '' });
+  const [form, setForm] = useState({ name: '', address: '', adminEmail: '', adminName: '', adminPassword: '', complexInviteCode: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -157,7 +160,11 @@ function CreateBuildingModal({ onClose, onCreated }) {
             <label className="block text-sm font-medium text-slate-600 mb-1">כתובת</label>
             <input value={form.address} onChange={(e) => set('address', e.target.value)} className="input" />
           </div>
-          <p className="text-xs text-slate-500 pt-1">פרטי חשבון האדמין של הבניין:</p>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">קוד הזמנה למתחם (אם הבניין חלק ממתחם - אופציונלי)</label>
+            <input value={form.complexInviteCode} onChange={(e) => set('complexInviteCode', e.target.value.toUpperCase())} className="input font-mono tracking-widest text-center" placeholder="ריק = בניין בודד" />
+          </div>
+          <p className="text-xs text-slate-500 pt-1">פרטי חשבון נציג הוועד של הבניין:</p>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">שם מלא</label>
             <input value={form.adminName} onChange={(e) => set('adminName', e.target.value)} className="input" required />

@@ -3,7 +3,7 @@ import { X, ShieldCheck, Building2, Users, Trash2 } from 'lucide-react';
 import { api } from '../api';
 import { formatDateHe } from '../format';
 
-const ROLE_LABEL = { ADMIN: 'עריכה מלאה', VIEWER: 'צפייה בלבד' };
+const ROLE_LABEL = { ADMIN: 'נציג ועד', COMMITTEE: 'נציג ועד', VIEWER: 'דייר', RESIDENT: 'דייר' };
 
 export default function AdminControlCenterModal({ currentUserId, onClose }) {
   const [tab, setTab] = useState('buildings');
@@ -107,15 +107,15 @@ function UsersPanel({ currentUserId }) {
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               {u.id === currentUserId ? (
-                <span className="text-xs text-slate-400">מנהל-על (את/ה)</span>
+                <span className="text-xs text-slate-400">מנהל אתר (את/ה)</span>
               ) : (
                 <select
                   value={u.role}
                   onChange={(e) => changeRole(u, e.target.value)}
                   className="text-xs border border-slate-200 rounded-md px-1.5 py-1"
                 >
-                  <option value="BUILDING_ADMIN">אדמין בניין</option>
-                  <option value="SUPER_ADMIN">מנהל-על</option>
+                  <option value="BUILDING_ADMIN">משתמש רגיל</option>
+                  <option value="SUPER_ADMIN">מנהל אתר</option>
                 </select>
               )}
               {u.id !== currentUserId && (

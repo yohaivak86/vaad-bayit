@@ -11,7 +11,8 @@ const MODES = [
 
 export default function AuthScreen({ onAuthenticated }) {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', buildingName: '', buildingAddress: '', inviteCode: '', marketingConsent: false });
+  const [form, setForm] = useState({ email: '', password: '', name: '', phone: '', buildingName: '', buildingAddress: '', inviteCode: '', complexInviteCode: '', marketingConsent: false });
+  const [inComplex, setInComplex] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
@@ -32,7 +33,7 @@ export default function AuthScreen({ onAuthenticated }) {
         const { user } = await api.login(form.email, form.password);
         onAuthenticated(user);
       } else if (mode === 'register') {
-        const res = await api.register(form);
+        const res = await api.register({ ...form, complexInviteCode: inComplex ? form.complexInviteCode : '' });
         onAuthenticated(res.user);
       } else {
         const res = await api.joinBuilding(form);
@@ -84,6 +85,31 @@ export default function AuthScreen({ onAuthenticated }) {
               </Field>
               <Field label="כתובת (אופציונלי)">
                 <input value={form.buildingAddress} onChange={(e) => set('buildingAddress', e.target.value)} className="input" />
+              </Field>
+              <Field label="סוג הבניין">
+                <div className="flex gap-2">
+                  {[{ v: false, label: 'בניין בודד' }, { v: true, label: 'חלק ממתחם' }].map((opt) => (
+                    <button
+                      type="button"
+                      key={String(opt.v)}
+                      onClick={() => setInComplex(opt.v)}
+                      className={`flex-1 rounded-xl border py-2 text-sm font-medium ${inComplex === opt.v ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 text-slate-600'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {inComplex ? (
+                  <input
+                    value={form.complexInviteCode}
+                    onChange={(e) => set('complexInviteCode', e.target.value.toUpperCase())}
+                    className="input mt-2 text-center font-mono tracking-widest"
+                    placeholder="קוד הזמנה למתחם"
+                    required
+                  />
+                ) : (
+                  <p className="mt-1 text-[11px] text-slate-400">אפשר לשייך את הבניין למתחם גם בהמשך, מפרופיל הבניין.</p>
+                )}
               </Field>
               <Field label="שם מלא">
                 <input value={form.name} onChange={(e) => set('name', e.target.value)} className="input" required />

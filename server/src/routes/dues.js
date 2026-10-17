@@ -102,3 +102,4 @@ router.post('/:id/mark-unpaid', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.ensureYearDues = ensureYearDues;

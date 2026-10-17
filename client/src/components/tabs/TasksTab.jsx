@@ -105,7 +105,10 @@ function FilterChip({ label, active, onClick }) {
   );
 }
 
-function TaskCard({ task, onStatusChange, onDelete, onSaveCost, readOnly }) {
+function TaskCard({ task, onStatusChange, onDelete, onSaveCost, readOnly: readOnlyProp }) {
+  // Complex tasks are shown here for context but managed from the complex profile.
+  const isComplexTask = task.scope === 'COMPLEX';
+  const readOnly = readOnlyProp || isComplexTask;
   const [showCostForm, setShowCostForm] = useState(false);
   const paidFromLabel = PAID_FROM_OPTIONS.find((o) => o.value === task.paidFrom)?.label;
 
@@ -122,8 +125,11 @@ function TaskCard({ task, onStatusChange, onDelete, onSaveCost, readOnly }) {
             {task.location && (
               <span className="flex items-center gap-0.5"><MapPin size={11} /> {task.location}</span>
             )}
-            <span>{formatDateHe(task.createdAt)}</span>
+            <span>{task.dueDate ? `יעד: ${formatDateHe(task.dueDate)}` : formatDateHe(task.createdAt)}</span>
             {task.isRecurring && <span className="text-blue-500">תקופתי</span>}
+            {isComplexTask && (
+              <span className="rounded-full bg-violet-50 px-2 py-0.5 font-semibold text-violet-700">משימת מתחם{task.complexName ? ` · ${task.complexName}` : ''}</span>
+            )}
           </div>
         </div>
         {!readOnly && (
@@ -238,7 +244,7 @@ function TaskCostFormModal({ task, onClose, onSave }) {
 }
 
 function TaskFormModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ title: '', description: '', location: '', urgency: 'רגיל', attachmentUrl: '' });
+  const [form, setForm] = useState({ title: '', description: '', location: '', urgency: 'רגיל', attachmentUrl: '', dueDate: '', showOnTimeline: true });
   const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
   return (
@@ -278,6 +284,14 @@ function TaskFormModal({ onClose, onSave }) {
               ))}
             </div>
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-600 mb-1">תאריך יעד (אופציונלי)</label>
+            <input type="date" value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} className="input" />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={form.showOnTimeline} onChange={(e) => set('showOnTimeline', e.target.checked)} />
+            להציג בציר הזמן השנתי
+          </label>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">קישור לתמונה / קבלה (אופציונלי)</label>
             <input value={form.attachmentUrl} onChange={(e) => set('attachmentUrl', e.target.value)} className="input" placeholder="https://..." />

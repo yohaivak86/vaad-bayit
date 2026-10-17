@@ -1,6 +1,16 @@
 const prisma = require('../lib/prisma');
 const { COOKIE_NAME, verifyToken } = require('../lib/auth');
 
+// Three permission levels:
+//   SITE_ADMIN  - User.role === 'SUPER_ADMIN'. Only they can make someone else a site admin.
+//   COMMITTEE   - נציג ועד, per building. Granted by a site admin or a committee rep of that building.
+//   RESIDENT    - דייר, the default. Sees only their own details; can only submit requests.
+// Rows written before this model used ADMIN/VIEWER - normalized on read.
+function normalizeBuildingRole(role) {
+  if (role === 'ADMIN' || role === 'COMMITTEE') return 'COMMITTEE';
+  return 'RESIDENT';
+}
+
 async function requireAuth(req, res, next) {
   const token = req.cookies?.[COOKIE_NAME];
   const payload = token && verifyToken(token);
@@ -13,15 +23,16 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-// Verifies req.user (set by requireAuth) can access the building in req.params.buildingId,
-// and records their access level (req.buildingRole) so writes can be blocked for viewers.
+// Verifies req.user can access the building in req.params.buildingId, and records their
+// level there (req.buildingRole = COMMITTEE | RESIDENT; a site admin counts as COMMITTEE).
 async function requireBuildingAccess(req, res, next) {
   const buildingId = Number(req.params.buildingId);
   if (!buildingId) return res.status(400).json({ error: 'buildingId חסר' });
 
   if (req.user.role === 'SUPER_ADMIN') {
     req.buildingId = buildingId;
-    req.buildingRole = 'ADMIN';
+    req.buildingRole = 'COMMITTEE';
+    req.isSiteAdmin = true;
     return next();
   }
 
@@ -30,29 +41,42 @@ async function requireBuildingAccess(req, res, next) {
   });
   if (!membership) return res.status(403).json({ error: 'אין הרשאה לבניין זה' });
   if (membership.status === 'PENDING') {
-    return res.status(403).json({ error: 'הבקשה שלך להצטרף לבניין ממתינה לאישור מנהל' });
+    return res.status(403).json({ error: 'הבקשה שלך להצטרף לבניין ממתינה לאישור נציג ועד' });
   }
 
   req.buildingId = buildingId;
-  req.buildingRole = membership.role;
+  req.buildingRole = normalizeBuildingRole(membership.role);
+  req.isSiteAdmin = false;
   next();
 }
 
-// Blocks any write (non-GET) request from a VIEWER - they can look but not touch.
-function blockViewerWrites(req, res, next) {
-  if (req.method !== 'GET' && req.buildingRole === 'VIEWER') {
-    return res.status(403).json({ error: 'למשתמש צפייה בלבד אין הרשאה לבצע שינויים' });
+// Residents can't enter data - the only writes they get are under /me (their own details and
+// requests such as reporting a cash payment, which a committee rep must then approve).
+function blockResidentWrites(req, res, next) {
+  if (req.method !== 'GET' && req.buildingRole === 'RESIDENT' && !/^\/me(\/|$)/.test(req.path)) {
+    return res.status(403).json({ error: 'דייר יכול רק לשלוח בקשות - ביצוע שינויים מתבצע על ידי נציג ועד' });
   }
   next();
 }
 
-// Some data (per-apartment payment status/debts) is sensitive enough that even a VIEWER
-// shouldn't read it, not just be blocked from editing it - full ADMIN only, no GET exception.
-function requireAdminRole(req, res, next) {
-  if (req.buildingRole !== 'ADMIN') {
-    return res.status(403).json({ error: 'מסך זה זמין לאדמיני הבניין בלבד' });
+// Everything financial / about other residents: committee reps (and the site admin) only.
+function requireCommittee(req, res, next) {
+  if (req.buildingRole !== 'COMMITTEE') {
+    return res.status(403).json({ error: 'מסך זה זמין לנציגי ועד בלבד' });
   }
   next();
 }
 
-module.exports = { requireAuth, requireBuildingAccess, blockViewerWrites, requireAdminRole };
+function requireSiteAdmin(req, res, next) {
+  if (req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'פעולה זו מיועדת למנהל אתר בלבד' });
+  next();
+}
+
+module.exports = {
+  normalizeBuildingRole,
+  requireAuth,
+  requireBuildingAccess,
+  blockResidentWrites,
+  requireCommittee,
+  requireSiteAdmin,
+};

@@ -68,7 +68,24 @@ export const api = {
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
   getBuildingAdmins: (buildingId) => request(`/buildings/${buildingId}/admins`),
   addBuildingAdmin: (buildingId, data) => request(`/buildings/${buildingId}/admins`, { method: 'POST', body: JSON.stringify(data) }),
-  approveBuildingAdmin: (buildingId, userId, role) => request(`/buildings/${buildingId}/admins/${userId}/approve`, { method: 'POST', body: JSON.stringify({ role }) }),
+  approveBuildingAdmin: (buildingId, userId, role, tenantId) => request(`/buildings/${buildingId}/admins/${userId}/approve`, { method: 'POST', body: JSON.stringify({ role, tenantId }) }),
+  linkMemberTenant: (buildingId, userId, tenantId) => request(`/buildings/${buildingId}/admins/${userId}/tenant`, { method: 'PUT', body: JSON.stringify({ tenantId }) }),
+
+  // Resident's own page (every role)
+  getMe: (buildingId, year) => request(`/buildings/${buildingId}/me?year=${year}`),
+  updateMe: (buildingId, data) => request(`/buildings/${buildingId}/me`, { method: 'PUT', body: JSON.stringify(data) }),
+  reportMyCash: (buildingId, dueId) => request(`/buildings/${buildingId}/me/dues/${dueId}/report-cash`, { method: 'POST' }),
+
+  // Timeline + building profile + providers (every role can read)
+  getTimeline: (buildingId, year) => request(`/buildings/${buildingId}/timeline?year=${year}`),
+  getBuildingProfile: (buildingId) => request(`/buildings/${buildingId}/profile`),
+  createProvider: (buildingId, data) => request(`/buildings/${buildingId}/providers`, { method: 'POST', body: JSON.stringify(data) }),
+  updateProvider: (buildingId, id, data) => request(`/buildings/${buildingId}/providers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteProvider: (buildingId, id) => request(`/buildings/${buildingId}/providers/${id}`, { method: 'DELETE' }),
+
+  // Moving a building in/out of a complex at any time (committee)
+  joinComplexFromBuilding: (buildingId, inviteCode) => request(`/buildings/${buildingId}/complex/join`, { method: 'POST', body: JSON.stringify({ inviteCode }) }),
+  leaveComplexFromBuilding: (buildingId) => request(`/buildings/${buildingId}/complex/leave`, { method: 'POST' }),
   updateBuildingAdminRole: (buildingId, userId, role) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'PUT', body: JSON.stringify({ role }) }),
   removeBuildingAdmin: (buildingId, userId) => request(`/buildings/${buildingId}/admins/${userId}`, { method: 'DELETE' }),
   regenerateInviteCode: (buildingId) => request(`/buildings/${buildingId}/invite-code/regenerate`, { method: 'POST' }),
@@ -85,6 +102,14 @@ export const api = {
   createComplexExpense: (id, data) => request(`/complexes/${id}/expenses`, { method: 'POST', body: JSON.stringify(data) }),
   deleteComplexExpense: (id, expenseId) => request(`/complexes/${id}/expenses/${expenseId}`, { method: 'DELETE' }),
   setComplexElectricityRate: (id, rate) => request(`/complexes/${id}/electricity-rate`, { method: 'PUT', body: JSON.stringify({ rate }) }),
+  getComplexProfile: (id) => request(`/complexes/${id}/profile`),
+  getComplexTasks: (id) => request(`/complexes/${id}/tasks`),
+  createComplexTask: (id, data) => request(`/complexes/${id}/tasks`, { method: 'POST', body: JSON.stringify(data) }),
+  updateComplexTask: (id, taskId, data) => request(`/complexes/${id}/tasks/${taskId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteComplexTask: (id, taskId) => request(`/complexes/${id}/tasks/${taskId}`, { method: 'DELETE' }),
+  createComplexProvider: (id, data) => request(`/complexes/${id}/providers`, { method: 'POST', body: JSON.stringify(data) }),
+  updateComplexProvider: (id, providerId, data) => request(`/complexes/${id}/providers/${providerId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteComplexProvider: (id, providerId) => request(`/complexes/${id}/providers/${providerId}`, { method: 'DELETE' }),
   getComplexElectricityReadings: (id) => request(`/complexes/${id}/electricity-readings`),
   addComplexElectricityReading: (id, data) => request(`/complexes/${id}/electricity-readings`, { method: 'POST', body: JSON.stringify(data) }),
   markElectricityDebtPaid: (id, debtId) => request(`/complexes/${id}/electricity-debts/${debtId}/mark-paid`, { method: 'POST' }),
