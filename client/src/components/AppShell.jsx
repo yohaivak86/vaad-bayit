@@ -21,7 +21,7 @@ export default function AppShell({
 
   const sidebar = (
     <div className="sidebar">
-      <div className="row" style={{ padding: 'var(--space-6) var(--space-4) var(--space-4)', gap: 'var(--space-3)' }}>
+      <div className="row" style={{ padding: 'var(--space-4) var(--space-4) var(--space-2)', gap: 'var(--space-3)' }}>
         <div className="chip chip--accent" style={{ width: 44, height: 44, padding: 0, justifyContent: 'center' }}>
           <Building2 size={22} />
         </div>
@@ -46,18 +46,16 @@ export default function AppShell({
         })}
       </nav>
 
-      <div className="hairline stack" style={{ gap: 2, padding: 'var(--space-3)', marginTop: 'auto' }}>
-        <ShareButton className="nav-item" iconSize={20} inviteCode={inviteCode} buildingName={building?.name} />
-        <button onClick={run(onOpenProfessionals)} className="nav-item"><Wrench size={20} /> בעלי מקצוע</button>
-        {isCommittee && (
-          <>
-            <button onClick={run(onManageAdmins)} className="nav-item"><Users size={20} /> ניהול משתמשים</button>
-            <button onClick={run(onOpenSettings)} className="nav-item"><Settings size={20} /> הגדרות בניין</button>
-          </>
-        )}
-        {showSwitch && <button onClick={run(onSwitchBuilding)} className="nav-item"><LayoutGrid size={20} /> החלפת בניין</button>}
-        <button onClick={onLogout} className="nav-item"><LogOut size={20} /> התנתקות</button>
-        <div className="row" style={{ padding: 'var(--space-3) var(--space-3) 0' }}>
+      <div className="hairline sidebar-foot">
+        <div className="side-tools">
+          <ShareButton className="side-tool" label="שיתוף" iconSize={20} inviteCode={inviteCode} buildingName={building?.name} />
+          <button onClick={run(onOpenProfessionals)} className="side-tool"><Wrench size={20} /> <span>בעלי מקצוע</span></button>
+          {isCommittee && <button onClick={run(onManageAdmins)} className="side-tool"><Users size={20} /> <span>משתמשים</span></button>}
+          {isCommittee && <button onClick={run(onOpenSettings)} className="side-tool"><Settings size={20} /> <span>הגדרות</span></button>}
+          {showSwitch && <button onClick={run(onSwitchBuilding)} className="side-tool"><LayoutGrid size={20} /> <span>החלפת בניין</span></button>}
+          <button onClick={onLogout} className="side-tool"><LogOut size={20} /> <span>התנתקות</span></button>
+        </div>
+        <div className="row" style={{ padding: 'var(--space-2) var(--space-3) 0' }}>
           <div className="chip" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center', font: 'var(--text-footnote)', fontWeight: 600 }}>
             {(user.name || '?').slice(0, 1)}
           </div>

@@ -413,6 +413,26 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child { background: #fff; bo
 }
 
 /* The WHOLE sidebar scrolls (never a small inner scroller that hides menu items on a short screen). */
-.sidebar { overflow-y: auto; overscroll-behavior: contain; }
-.sidebar .nav-item { min-height: 42px; flex-shrink: 0; }
-@media (max-height: 820px) { .sidebar .nav-item { min-height: 38px; } }
+
+/* The sidebar NEVER scrolls: every menu item fits, and the secondary actions sit in a compact 3-column grid. */
+.sidebar { overflow: hidden; }
+.sidebar nav { padding-block: 0; }
+.sidebar .nav-item { min-height: 40px; }
+.sidebar-foot { margin-top: auto; padding: var(--space-2) var(--space-3) var(--space-3); flex-shrink: 0; }
+.side-tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.side-tool {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; padding: 4px 2px;
+  border-radius: 0.8rem; color: rgba(226, 232, 240, 0.85); font-size: 11.5px; font-weight: 600; line-height: 1.15; text-align: center;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.side-tool:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.side-tool svg { color: rgba(191, 219, 254, 0.95); }
+@media (max-height: 760px) {
+  .sidebar .nav-item { min-height: 36px; font-size: 14px; }
+  .side-tool { min-height: 46px; font-size: 11px; }
+}
+@media (max-height: 640px) {
+  .sidebar .nav-item { min-height: 32px; font-size: 13px; gap: 8px; }
+  .side-tool { min-height: 40px; }
+  .side-tool span { display: none; }
+}
