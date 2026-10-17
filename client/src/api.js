@@ -76,6 +76,8 @@ export const api = {
   setRedLine: (buildingId, treasuryRedLine) => request(`/buildings/${buildingId}/red-line`, { method: 'PUT', body: JSON.stringify({ treasuryRedLine }) }),
   getUpcoming: (buildingId, offset = 1) => request(`/buildings/${buildingId}/upcoming?offset=${offset}`),
   getUpcomingMonth: (buildingId, year, month) => request(`/buildings/${buildingId}/upcoming?month=${year}-${month}`),
+  getYearPlan: (buildingId, year) => request(`/buildings/${buildingId}/timeline/plan?year=${year}`),
+  setTimelineSettings: (buildingId, showAmountsToResidents) => request(`/buildings/${buildingId}/timeline/settings`, { method: 'PUT', body: JSON.stringify({ showAmountsToResidents }) }),
   getForecast: (buildingId, year) => request(`/buildings/${buildingId}/timeline/forecast?year=${year}`),
 
   // Votes

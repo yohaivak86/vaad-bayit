@@ -312,3 +312,53 @@ button:focus-visible, a:focus-visible { outline: none; box-shadow: 0 0 0 4px rgb
 /* ---------- Modals ---------- */
 div.fixed.inset-0[class*='bg-black/40'] > div:first-child { background: #fff; box-shadow: 0 30px 70px -20px rgba(15, 23, 42, 0.55); }
 .sheet { background: #fff; }
+
+/* ---------- Year timeline: a line through the months, a "today" marker, cards hanging under each month ---------- */
+.tl-wrap { overflow-x: auto; padding-bottom: var(--space-3); }
+.tl { position: relative; display: grid; grid-template-columns: repeat(12, minmax(160px, 1fr)); min-width: 1920px; padding-top: 4px; }
+.tl-line { position: absolute; inset-inline: 0; top: 28px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981); opacity: 0.85; }
+.tl-col { position: relative; padding: 0 var(--space-2); min-width: 0; }
+.tl-node { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: var(--space-3); }
+.tl-month {
+  display: inline-flex; align-items: center; justify-content: center; height: 42px; min-width: 96px; padding: 0 var(--space-4);
+  border-radius: var(--radius-pill); background: #fff; color: #1e3a8a; font-weight: 700; font-size: 16px;
+  border: 3px solid #3b82f6; box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.5);
+}
+.tl-month--now { background: var(--grad-blue); color: #fff; border-color: #1d4ed8; }
+.tl-total { font: var(--text-caption); font-weight: 700; color: #1d4ed8; background: #dbeafe; padding: 2px 10px; border-radius: var(--radius-pill); }
+.tl-card {
+  background: #fff; border-radius: 12px; padding: 8px 10px; margin-bottom: 8px; border-inline-start: 5px solid var(--c, #3b82f6);
+  box-shadow: 0 6px 14px -8px rgba(15, 23, 42, 0.35); font-size: 14px; line-height: 1.35; color: var(--label); text-align: start;
+}
+.tl-meta { color: var(--label-secondary); }
+.tl-amount { margin-top: 2px; font-weight: 700; color: #1d4ed8; }
+.tl-line-item { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #334155; padding-top: 2px; }
+.tl-line-item--sum { border-top: 1px dashed #cbd5e1; margin-top: 4px; font-weight: 700; color: #1d4ed8; }
+.tl-today { position: absolute; z-index: 3; top: 0; bottom: 0; width: 3px; inset-inline-start: var(--today); background: #f43f5e; border-radius: 3px; pointer-events: none; }
+.tl-today span { position: absolute; top: -2px; left: 50%; transform: translateX(-50%); background: #f43f5e; color: #fff; font: var(--text-caption); font-weight: 700; padding: 1px 8px; border-radius: var(--radius-pill); white-space: nowrap; }
+
+/* Narrow screens: the same timeline, running top to bottom */
+@media (max-width: 899px) {
+  .tl { grid-template-columns: 1fr; min-width: 0; }
+  .tl-line { inset-inline: auto; inset-inline-start: 16px; top: 0; bottom: 0; width: 6px; height: auto; background: linear-gradient(180deg, #3b82f6, #8b5cf6, #10b981); }
+  .tl-col { padding: 0 0 var(--space-4); padding-inline-start: 52px; }
+  .tl-col::before { content: ''; position: absolute; inset-inline-start: 6px; top: 8px; width: 26px; height: 26px; border-radius: 50%; background: #fff; border: 5px solid #3b82f6; z-index: 2; }
+  .tl-node { flex-direction: row; align-items: center; justify-content: flex-start; flex-wrap: wrap; }
+  .tl-today { inset-inline: 0; width: auto; bottom: auto; height: 3px; top: var(--today); }
+  .tl-today span { top: -10px; left: auto; right: 8px; transform: none; }
+}
+
+/* On the big screen: larger type for the back of the room */
+.tl-presentation .tl { min-width: 0; }
+.tl-presentation .tl-card { font-size: 16px; }
+.tl-presentation .tl-line-item { font-size: 15px; }
+.tl-presentation .tl-month { font-size: 19px; height: 48px; }
+.tl-presentation .tl-line { top: 31px; }
+.tl-presentation .tl-total { font-size: 14px; }
+.tl-presentation .row.text-footnote { color: #bfdbfe; }
+
+@media print {
+  .tl { min-width: 0; grid-template-columns: repeat(4, 1fr); row-gap: var(--space-4); }
+  .tl-line, .tl-today { display: none; }
+  .tl-card { box-shadow: none; border: 1px solid #e2e8f0; border-inline-start: 5px solid var(--c); }
+}

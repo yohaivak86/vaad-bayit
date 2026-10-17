@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  CalendarRange, UserRound, Users, ClipboardList, Receipt, LineChart, FileText, Building2, Network, Vote, ArrowRight,
+  CalendarRange, UserRound, Users, ClipboardList, Receipt, LineChart, FileText, Building2, Network, Vote, ArrowRight, Milestone,
 } from 'lucide-react';
 import AppShell from './components/AppShell';
 import OnboardingModal from './components/OnboardingModal';
@@ -23,6 +23,7 @@ import ExpensesTab from './components/tabs/ExpensesTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
 import VotesTab from './components/tabs/VotesTab';
+import YearTimeline from './components/tabs/YearTimeline';
 import BuildingProfile from './components/tabs/BuildingProfile';
 import ComplexProfile from './components/tabs/ComplexProfile';
 import { api } from './api';
@@ -31,6 +32,7 @@ import { createExpenseFromForm } from './lib/expenseSave';
 // `label` is the sidebar entry AND the title shown at the top of the screen; `sub` is the line under it.
 const NAV_ITEMS = {
   dashboard: { label: 'מסך ראשי', sub: 'הקופה, מה מצפה בחודש הקרוב, והציר השנתי', subResident: 'מה מצפה בחודש הקרוב והציר השנתי', icon: CalendarRange },
+  timeline: { label: 'ציר זמן', sub: 'כל ההוצאות והמשימות הצפויות במהלך השנה - להצגה על מסך', icon: Milestone },
   me: { label: 'הדף שלי', sub: 'הפרטים שלי ודמי הוועד', icon: UserRound },
   tenants: { label: 'דיירים וגבייה', sub: 'דמי ועד, תשלומים וחובות', icon: Users },
   tasks: { label: 'משימות ותקלות', sub: 'תקלות מהדיירים, משימות מתוכננות ובעלי מקצוע', subResident: 'מה קורה בבניין, ופתיחת תקלה חדשה', icon: ClipboardList },
@@ -46,8 +48,8 @@ const NAV_ITEMS = {
 // votes and the profiles - never money or other residents. Committee reps / the site admin get everything.
 function navKeysFor(role, inComplex) {
   const keys = role === 'COMMITTEE'
-    ? ['dashboard', ...(inComplex ? ['complex'] : []), 'tenants', 'tasks', 'expenses', 'budget', 'documents', 'votes', 'building']
-    : ['me', 'dashboard', 'tasks', 'votes', 'documents', 'building', ...(inComplex ? ['complex'] : [])];
+    ? ['dashboard', 'timeline', ...(inComplex ? ['complex'] : []), 'tenants', 'tasks', 'expenses', 'budget', 'documents', 'votes', 'building']
+    : ['me', 'dashboard', 'timeline', 'tasks', 'votes', 'documents', 'building', ...(inComplex ? ['complex'] : [])];
   return keys;
 }
 
@@ -258,6 +260,7 @@ export default function App() {
       {tab === 'expenses' && isCommittee && <ExpensesTab key={`exp-${version}-${JSON.stringify(route.params)}`} initial={route.params} buildingId={buildingId} building={building} onBalanceChanged={refreshBalance} />}
       {tab === 'budget' && isCommittee && <BudgetTab buildingId={buildingId} readOnly={false} />}
       {tab === 'documents' && <DocumentsTab buildingId={buildingId} readOnly={!isCommittee} />}
+      {tab === 'timeline' && <YearTimeline buildingId={buildingId} />}
       {tab === 'votes' && <VotesTab buildingId={buildingId} isCommittee={isCommittee} />}
       {tab === 'building' && (
         <BuildingProfile
