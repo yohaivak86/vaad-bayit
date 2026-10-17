@@ -34,8 +34,8 @@ export default function DocumentsTab({ buildingId, readOnly }) {
     <div className="page stack" style={{ gap: 'var(--space-4)' }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <div className="segmented">
-          <button aria-pressed={view === 'minutes'} onClick={() => setView('minutes')}>פרוטוקולים וסיכומי ועד</button>
-          <button aria-pressed={view === 'procedures'} onClick={() => setView('procedures')}>נהלי בניין</button>
+          <button aria-pressed={view === 'minutes'} onClick={() => setView('minutes')}>פרוטוקולים וסיכומי ועד{minutes ? ` (${minutes.length})` : ''}</button>
+          <button aria-pressed={view === 'procedures'} onClick={() => setView('procedures')}>נהלי בניין{procedures ? ` (${procedures.length})` : ''}</button>
         </div>
         {!readOnly && <button className="btn btn--primary" onClick={() => setSheet({ kind: view })}><Plus size={20} /> {addLabel}</button>}
       </div>

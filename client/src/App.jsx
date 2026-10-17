@@ -38,7 +38,7 @@ const NAV_ITEMS = {
   tasks: { label: 'משימות ותקלות', sub: 'תקלות מהדיירים, משימות מתוכננות ובעלי מקצוע', subResident: 'מה קורה בבניין, ופתיחת תקלה חדשה', icon: ClipboardList },
   expenses: { label: 'הוצאות', sub: 'מה שולם, ומה צפוי בחודשים הקרובים', icon: Receipt },
   budget: { label: 'תכנון שנתי', sub: 'תקציב והקרנת הקופה', icon: LineChart },
-  documents: { label: 'פרוטוקולים ונהלים', sub: 'פרוטוקולים וסיכומי ועד, ונהלי הבניין', icon: FileText },
+  documents: { label: 'פרוטוקולים ונהלי בניין', sub: 'פרוטוקולים וסיכומי ועד, ונהלי הבניין', icon: FileText },
   votes: { label: 'הצבעות', sub: 'קול אחד לכל דירה', icon: Vote },
   building: { label: 'פרופיל בניין', sub: 'פרטי הבניין, שיוך למתחם ובעלי מקצוע', icon: Building2 },
   complex: { label: 'פרופיל מתחם', sub: 'הבניינים, נציגי הוועד ובעלי המקצוע של המתחם', icon: Network },
