@@ -15,6 +15,8 @@ async function scopeFilter(buildingId) {
   return member ? { OR: [{ buildingId }, { complexId: member.complexId }] } : { buildingId };
 }
 
+const badCost = (v) => v !== undefined && v !== null && v !== '' && !(Number(v) >= 0);
+
 function isResident(req) {
   return req.buildingRole === 'RESIDENT';
 }
@@ -65,6 +67,7 @@ async function checkRecurring(buildingId, recurringItemId) {
 router.post('/', async (req, res) => {
   const { title, description, location, urgency, attachmentUrl, isRecurring, recurrenceLabel, cost, paidFrom, dueDate, showOnTimeline, recurringItemId, contractorName, contractorPhone } = req.body;
   if (!title || !title.trim()) return res.status(400).json({ error: 'יש להזין כותרת' });
+  if (badCost(cost)) return res.status(400).json({ error: 'העלות חייבת להיות מספר חיובי' });
 
   const resident = isResident(req);
   const linkedRecurring = resident ? null : await checkRecurring(req.buildingId, recurringItemId);
@@ -105,6 +108,8 @@ router.put('/:id', async (req, res) => {
   const id = Number(req.params.id);
   const existing = await prisma.task.findFirst({ where: { id, buildingId: req.buildingId } });
   if (!existing) return res.status(404).json({ error: 'משימה לא נמצאה' });
+
+  if (badCost(req.body.cost)) return res.status(400).json({ error: 'העלות חייבת להיות מספר חיובי' });
 
   const resident = isResident(req);
   if (resident && (existing.reportedById !== req.user.id || existing.status === 'RESOLVED')) {

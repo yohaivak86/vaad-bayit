@@ -81,16 +81,18 @@ svg.lucide { stroke-width: 1.75; }
 /* ---------- Sheets (modals) ---------- */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sheet-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-.rise-in { animation: sheet-in 0.3s var(--ease) both; }
+/* `backwards` (not `both`): holding the final keyframe would leave an identity transform on the element,
+   which makes every position:fixed modal inside it size itself to this element instead of the screen. */
+.rise-in { animation: sheet-in 0.3s var(--ease) backwards; }
 /* Every existing modal uses a `fixed inset-0 bg-black/40` backdrop - give them the Lumen sheet look. */
 div.fixed.inset-0[class*='bg-black/40'] {
   background: var(--overlay);
   -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-  animation: fade-in var(--duration) var(--ease) both;
+  animation: fade-in var(--duration) var(--ease) backwards;
 }
 div.fixed.inset-0[class*='bg-black/40'] > div:first-child {
   background: var(--bg-grouped);
-  animation: sheet-in 0.3s var(--ease) both;
+  animation: sheet-in 0.3s var(--ease) backwards;
   box-shadow: var(--shadow-card);
 }
 .sheet {
@@ -134,7 +136,7 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child {
 .auth-panel { display: flex; align-items: flex-start; justify-content: center; padding: var(--space-4); }
 @media (min-width: 960px) { .auth-panel { align-items: center; padding: var(--space-8); } }
 .auth-card { width: 100%; max-width: 440px; }
-.auth-caption { font: var(--text-title); text-align: center; color: var(--label); animation: sheet-in 0.4s var(--ease) both; min-height: 56px; }
+.auth-caption { font: var(--text-title); text-align: center; color: var(--label); animation: sheet-in 0.4s var(--ease) backwards; min-height: 56px; }
 .stage { position: relative; width: 100%; max-width: 280px; aspect-ratio: 520 / 420; margin-inline: auto; }
 @media (min-width: 960px) { .stage { max-width: 520px; } }
 .scene { position: absolute; inset: 0; opacity: 0; transform: translateY(14px) scale(0.97); pointer-events: none; transition: opacity 0.45s var(--ease), transform 0.45s var(--ease); }

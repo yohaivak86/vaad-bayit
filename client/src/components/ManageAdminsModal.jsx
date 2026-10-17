@@ -75,7 +75,7 @@ export default function ManageAdminsModal({ buildingId, currentUserId, building,
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-3">
             <p className="mb-1.5 text-xs font-semibold text-blue-800">קוד הזמנה לבניין</p>
             <p className="mb-2 text-[11px] text-blue-700">
-              מי שנרשם עם הקוד (בטאב "הצטרפות") נכנס כ"דייר" ממתין - נציג ועד מאשר אותו, בוחר הרשאה ומשייך אותו לדירה.
+              מי שמזין את הקוד (או מחפש את הבניין) אחרי שנרשם נכנס כ"דייר" ממתין - נציג ועד מאשר אותו, בוחר הרשאה ומשייך אותו לדירה.
             </p>
             <div className="flex items-center gap-2">
               <span className="flex-1 rounded-lg border border-blue-200 bg-white py-1.5 text-center font-mono text-sm tracking-widest text-blue-900">{inviteCode}</span>
