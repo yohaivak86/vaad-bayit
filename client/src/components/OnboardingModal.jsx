@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { Network } from 'lucide-react';
+import ComplexPicker from './ComplexPicker';
+import Sheet from './Sheet';
 
 const FIELD_DEFS = [
   { key: 'name', label: 'שם הבניין', type: 'text' },
@@ -17,16 +19,16 @@ const FIELD_DEFS = [
   { key: 'gardeningBenchmark', label: 'עלות גינון חודשית משוערת', type: 'number' },
 ];
 
-export default function OnboardingModal({ building, onClose, onSave }) {
+// Building settings. The "join a complex" option sits right here so it is easy to find: search for the
+// complex (number / name / address / code), send the request, and the complex's manager approves.
+export default function OnboardingModal({ building, buildingId, complex, onClose, onSave, onComplexChanged }) {
   const [form, setForm] = useState({});
 
   useEffect(() => {
     if (building) {
       setForm({
         ...building,
-        openingBalanceDate: building.openingBalanceDate
-          ? new Date(building.openingBalanceDate).toISOString().slice(0, 10)
-          : '',
+        openingBalanceDate: building.openingBalanceDate ? new Date(building.openingBalanceDate).toISOString().slice(0, 10) : '',
       });
     }
   }, [building]);
@@ -39,43 +41,30 @@ export default function OnboardingModal({ building, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
-          <h2 className="font-bold text-lg text-slate-800">הגדרות בניין</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-500">
-            <X size={20} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-5 py-4 space-y-3 flex-1">
+    <Sheet title="הגדרות בניין" onClose={onClose}>
+      <div className="stack" style={{ gap: 'var(--space-6)' }}>
+        <section className="stack" style={{ gap: 'var(--space-3)' }}>
+          <h3 className="row" style={{ margin: 0 }}><Network size={20} /> שיוך למתחם</h3>
+          {complex ? (
+            <p className="text-footnote text-secondary" style={{ margin: 0 }}>הבניין משתייך למתחם {complex.number} · {complex.name}. להסרה מהמתחם: פרופיל בניין.</p>
+          ) : buildingId ? (
+            <>
+              <p className="text-footnote text-secondary" style={{ margin: 0 }}>הבניין בודד כרגע. חפשו מתחם לפי מספר, שם, כתובת או קוד, ושלחו בקשת הצטרפות - מנהל המתחם יאשר.</p>
+              <ComplexPicker buildingId={buildingId} onChanged={onComplexChanged} />
+            </>
+          ) : null}
+        </section>
+
+        <form onSubmit={handleSubmit} className="stack">
           {FIELD_DEFS.map((f) => (
-            <div key={f.key}>
-              <label className="block text-sm font-medium text-slate-600 mb-1">{f.label}</label>
-              <input
-                type={f.type}
-                value={form[f.key] ?? ''}
-                onChange={(e) => set(f.key, e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div key={f.key} className="field">
+              <label>{f.label}</label>
+              <input type={f.type} value={form[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)} className="input" step={f.type === 'number' ? 'any' : undefined} />
             </div>
           ))}
-          <div className="pt-2 flex gap-2">
-            <button
-              type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg py-2.5 text-sm transition"
-            >
-              שמירה
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50"
-            >
-              ביטול
-            </button>
-          </div>
+          <button type="submit" className="btn btn--primary">שמירה</button>
         </form>
       </div>
-    </div>
+    </Sheet>
   );
 }

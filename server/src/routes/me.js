@@ -1,11 +1,12 @@
 const express = require('express');
 const prisma = require('../lib/prisma');
 const { ensureYearDues } = require('./dues');
+const { tenantForUser } = require('../lib/apartments');
 
 const router = express.Router({ mergeParams: true });
 
 async function myTenant(req) {
-  return prisma.tenant.findFirst({ where: { buildingId: req.buildingId, userId: req.user.id } });
+  return tenantForUser(req.buildingId, req.user.id);
 }
 
 // A resident's own page: just their apartment's details and their own monthly dues.

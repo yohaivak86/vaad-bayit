@@ -3,12 +3,13 @@ import {
   Building2, LayoutGrid, LogOut, Menu, X, Users, Settings, Wrench, Copy, Check, Network, Plus, ReceiptText,
 } from 'lucide-react';
 import { ROLE_LABELS } from '../constants';
+import ShareButton from './ShareButton';
 
 export default function AppShell({
   user, building, role, isSiteAdmin, nav, active, onNav, complex,
   showSwitch, onSwitchBuilding, onLogout,
   onAddExpense, onApprovePayment, onManageAdmins, onOpenSettings, onOpenProfessionals,
-  pendingComplexRequests = 0,
+  pendingComplexRequests = 0, inviteCode,
   children,
 }) {
   const [drawer, setDrawer] = useState(false);
@@ -46,6 +47,7 @@ export default function AppShell({
       </nav>
 
       <div className="hairline stack" style={{ gap: 2, padding: 'var(--space-3)' }}>
+        <ShareButton className="nav-item" iconSize={20} inviteCode={inviteCode} buildingName={building?.name} />
         <button onClick={run(onOpenProfessionals)} className="nav-item"><Wrench size={20} /> בעלי מקצוע</button>
         {isCommittee && (
           <>
@@ -122,9 +124,9 @@ function InviteChip({ code }) {
     } catch { /* clipboard unavailable */ }
   };
   return (
-    <button onClick={copy} title="קוד הזמנה לבניין - לחצו להעתקה" className="chip chip--accent" style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.08em' }}>
+    <button onClick={copy} title="קוד הבניין - לחצו להעתקה" className="chip chip--accent" style={{ fontFamily: 'ui-monospace, monospace', letterSpacing: '0.08em' }}>
       {copied ? <Check size={12} /> : <Copy size={12} />}
-      {code}
+      <span style={{ fontFamily: 'var(--font-sans)', letterSpacing: 0 }}>קוד בניין:</span> {code}
     </button>
   );
 }

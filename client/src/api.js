@@ -8,7 +8,8 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `שגיאת שרת (${res.status})`);
+    // keep the status and the whole body: some answers (e.g. "confirm changing this vote") carry data
+    throw Object.assign(new Error(body.error || `שגיאת שרת (${res.status})`), { status: res.status, data: body });
   }
   if (res.status === 204) return null;
   return res.json();
@@ -74,6 +75,16 @@ export const api = {
   getBalance: (buildingId) => request(`/buildings/${buildingId}/balance`),
   setRedLine: (buildingId, treasuryRedLine) => request(`/buildings/${buildingId}/red-line`, { method: 'PUT', body: JSON.stringify({ treasuryRedLine }) }),
   getUpcoming: (buildingId, offset = 1) => request(`/buildings/${buildingId}/upcoming?offset=${offset}`),
+  getUpcomingMonth: (buildingId, year, month) => request(`/buildings/${buildingId}/upcoming?month=${year}-${month}`),
+  getForecast: (buildingId, year) => request(`/buildings/${buildingId}/timeline/forecast?year=${year}`),
+
+  // Votes
+  getPolls: (buildingId) => request(`/buildings/${buildingId}/polls`),
+  createPoll: (buildingId, data) => request(`/buildings/${buildingId}/polls`, { method: 'POST', body: JSON.stringify(data) }),
+  updatePoll: (buildingId, id, data) => request(`/buildings/${buildingId}/polls/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePoll: (buildingId, id) => request(`/buildings/${buildingId}/polls/${id}`, { method: 'DELETE' }),
+  getPollLog: (buildingId, id) => request(`/buildings/${buildingId}/polls/${id}/log`),
+  vote: (buildingId, id, optionIndex, confirm = false) => request(`/buildings/${buildingId}/polls/${id}/vote`, { method: 'POST', body: JSON.stringify({ optionIndex, confirm }) }),
   getRecurring: (buildingId) => request(`/buildings/${buildingId}/recurring`),
   createRecurring: (buildingId, data) => request(`/buildings/${buildingId}/recurring`, { method: 'POST', body: JSON.stringify(data) }),
   bulkRecurring: (buildingId, items) => request(`/buildings/${buildingId}/recurring/bulk`, { method: 'POST', body: JSON.stringify({ items }) }),

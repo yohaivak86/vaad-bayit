@@ -23,6 +23,7 @@ model User {
   passwordResets PasswordReset[]
   complexJoinRequests ComplexJoinRequest[]
   reportedTasks  Task[]          @relation("TaskReporter")
+  apartmentLinks ApartmentResident[]
 }
 
 // One-time password-reset token, e-mailed to the user. Only the SHA-256 hash is stored.
@@ -121,6 +122,7 @@ model Building {
   providers       ServiceProvider[]
   providerLinks   ServiceProviderLink[]
   recurringItems  RecurringItem[]
+  polls           Poll[]
   complexJoinRequests ComplexJoinRequest[]
 }
 
@@ -293,6 +295,7 @@ model Tenant {
   user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   createdAt       DateTime @default(now())
   dues            Due[]
+  residents       ApartmentResident[]
 
   @@unique([buildingId, userId])
 }
@@ -406,4 +409,63 @@ model ServiceProviderLink {
   building   Building        @relation(fields: [buildingId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, buildingId])
+}
+
+// Additional residents of the same apartment (the first one is Tenant.userId). Lets a whole household
+// have accounts - while a poll still counts one vote per apartment.
+model ApartmentResident {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  buildingId Int
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([buildingId, userId])
+}
+
+// A building vote. One vote per APARTMENT (Vote.apartmentNumber), no matter how many residents it has.
+model Poll {
+  id          Int       @id @default(autoincrement())
+  buildingId  Int
+  building    Building  @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  options     String[]
+  status      String    @default("OPEN") // OPEN | CLOSED
+  closesAt    DateTime?
+  createdById Int?
+  createdAt   DateTime  @default(now())
+
+  votes Vote[]
+  logs  VoteLog[]
+}
+
+model Vote {
+  id              Int      @id @default(autoincrement())
+  pollId          Int
+  poll            Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  apartmentNumber String
+  optionIndex     Int
+  castById        Int
+  castByName      String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([pollId, apartmentNumber])
+}
+
+// Every CHANGE of an existing vote (by the same or another resident of the apartment) - committee only.
+model VoteLog {
+  id                Int      @id @default(autoincrement())
+  pollId            Int
+  poll              Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  apartmentNumber   String
+  changedById       Int
+  changedByName     String
+  previousVoterName String
+  previousOption    Int
+  newOption         Int
+  createdAt         DateTime @default(now())
 }

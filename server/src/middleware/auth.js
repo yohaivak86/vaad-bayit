@@ -56,7 +56,8 @@ function blockResidentWrites(req, res, next) {
   // Residents may also open a fault (POST /tasks) and edit their own report (PUT /tasks/:id) -
   // the route itself restricts that to reports they opened.
   const residentTaskWrite = (req.method === 'POST' && req.path === '/tasks') || (req.method === 'PUT' && /^\/tasks\/\d+$/.test(req.path));
-  if (req.method !== 'GET' && req.buildingRole === 'RESIDENT' && !residentTaskWrite && !/^\/me(\/|$)/.test(req.path)) {
+  const residentVote = req.method === 'POST' && /^\/polls\/\d+\/vote$/.test(req.path);
+  if (req.method !== 'GET' && req.buildingRole === 'RESIDENT' && !residentTaskWrite && !residentVote && !/^\/me(\/|$)/.test(req.path)) {
     return res.status(403).json({ error: 'דייר יכול רק לשלוח בקשות - ביצוע שינויים מתבצע על ידי נציג ועד' });
   }
   next();
@@ -70,6 +71,12 @@ function requireCommittee(req, res, next) {
   next();
 }
 
+// Readable by every role, changeable by committee reps only (documents: protocols, procedures).
+function committeeWritesOnly(req, res, next) {
+  if (req.method === 'GET') return next();
+  return requireCommittee(req, res, next);
+}
+
 function requireSiteAdmin(req, res, next) {
   if (req.user.role !== 'SUPER_ADMIN') return res.status(403).json({ error: 'פעולה זו מיועדת למנהל אתר בלבד' });
   next();
@@ -81,5 +88,6 @@ module.exports = {
   requireBuildingAccess,
   blockResidentWrites,
   requireCommittee,
+  committeeWritesOnly,
   requireSiteAdmin,
 };

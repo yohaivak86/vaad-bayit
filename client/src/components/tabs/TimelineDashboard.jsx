@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronRight, ChevronLeft, Maximize2, Minimize2, Receipt, Network, CalendarClock, ShieldAlert, Pencil, Check, TriangleAlert,
+  ChevronRight, ChevronLeft, Maximize2, Minimize2, Receipt, Network, CalendarClock, ShieldAlert, Pencil, Check, TriangleAlert, ListChecks,
 } from 'lucide-react';
 import { api } from '../../api';
 import { MONTHS_HE, formatILS } from '../../format';
@@ -13,108 +13,23 @@ const STATUS = {
   RESOLVED: { label: 'הושלם', dot: 'success' },
 };
 
-export default function TimelineDashboard({ buildingId, role, balance, complexName, onBalanceChanged, onOpenTasks, onPayExpected }) {
-  const nowYear = new Date().getFullYear();
-  const [year, setYear] = useState(nowYear);
-  const [data, setData] = useState(null);
-  const [fullscreen, setFullscreen] = useState(false);
-  const stageRef = useRef(null);
+// The main screen. Every number and card on it opens the screen behind it (`onNavigate(tab, params)`).
+export default function TimelineDashboard({ buildingId, role, balance, complexName, onBalanceChanged, onNavigate, onPayExpected }) {
   const isCommittee = role === 'COMMITTEE';
-
-  useEffect(() => {
-    setData(null);
-    api.getTimeline(buildingId, year).then(setData).catch(() => setData({ items: [] }));
-  }, [buildingId, year]);
-
-  useEffect(() => {
-    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', onChange);
-    return () => document.removeEventListener('fullscreenchange', onChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else stageRef.current?.requestFullscreen?.();
-  };
-
-  const byMonth = useMemo(() => {
-    const months = Array.from({ length: 12 }, () => []);
-    (data?.items || []).forEach((it) => months[new Date(it.date).getMonth()].push(it));
-    return months;
-  }, [data]);
-
-  const items = data?.items || [];
-  const tasks = items.filter((i) => i.kind === 'TASK');
-  const open = tasks.filter((t) => t.status !== 'RESOLVED');
-  const urgent = open.filter((t) => t.urgent);
-  const resolved = tasks.filter((t) => t.status === 'RESOLVED');
-  const currentMonth = year === nowYear ? new Date().getMonth() : -1;
+  const now = new Date();
 
   return (
     <div className="page stack" style={{ maxWidth: 1600, gap: 'var(--space-6)' }}>
-      <div>
-        <h1 className="page-title" style={{ margin: 0 }}>לוח בקרה</h1>
-        <p className="page-sub" style={{ margin: 0 }}>{isCommittee ? 'הקופה, מה מצפה בחודש הקרוב, והשנה כולה' : 'מה מצפה בחודש הקרוב והשנה כולה'}</p>
-      </div>
-
       {isCommittee && (
         <section className="stack" style={{ gap: 'var(--space-3)' }}>
-          <BalanceCards balance={balance} />
+          <BalanceCards balance={balance} onSelect={(paidFrom) => onNavigate('expenses', { view: 'movements', ...(paidFrom ? { paidFrom } : {}) })} />
           <RedLine buildingId={buildingId} balance={balance} onSaved={onBalanceChanged} />
         </section>
       )}
 
-      <NextMonth buildingId={buildingId} isCommittee={isCommittee} balance={balance} onOpenTasks={onOpenTasks} onPayExpected={onPayExpected} />
+      <NextMonth buildingId={buildingId} isCommittee={isCommittee} balance={balance} onNavigate={onNavigate} onPayExpected={onPayExpected} />
 
-      <section ref={stageRef} className={`card ${fullscreen ? 'presentation' : ''}`} style={fullscreen ? { overflow: 'auto', borderRadius: 0 } : undefined}>
-        <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: fullscreen ? 34 : undefined }}>ציר זמן שנתי {year}</h2>
-            <p className="page-sub" style={{ margin: 0 }}>{complexName ? `כולל משימות המתחם "${complexName}"` : 'משימות, תקלות והוצאות מרכזיות לאורך השנה'}</p>
-          </div>
-          <div className="row no-print">
-            <button onClick={() => setYear((y) => y - 1)} className="icon-btn" aria-label="שנה קודמת"><ChevronRight size={20} /></button>
-            <span style={{ minWidth: 48, textAlign: 'center', font: 'var(--text-headline)' }}>{year}</span>
-            <button onClick={() => setYear((y) => y + 1)} className="icon-btn" aria-label="שנה הבאה"><ChevronLeft size={20} /></button>
-            <button onClick={toggleFullscreen} className="btn btn--secondary btn--small">
-              {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'יציאה' : 'מצב תצוגה'}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" style={{ marginBottom: 'var(--space-4)' }}>
-          <Kpi label="משימות פתוחות" value={open.length} />
-          <Kpi label="דחופות" value={urgent.length} dot="danger" />
-          <Kpi label="הושלמו השנה" value={resolved.length} dot="success" />
-          <Kpi label="פריטים בציר" value={items.length} />
-        </div>
-
-        {!data && <p className="empty">טוען...</p>}
-
-        {data && (
-          <div className="overflow-x-auto" style={{ paddingBottom: 'var(--space-3)' }}>
-            <div className="grid min-w-[1180px] grid-cols-12 gap-2" style={{ direction: 'rtl' }}>
-              {MONTHS_HE.map((m, idx) => (
-                <div key={m} className="min-w-0">
-                  <div
-                    className={idx === currentMonth ? 'chip chip--accent' : 'chip'}
-                    style={{ width: '100%', justifyContent: 'center', marginBottom: 'var(--space-2)', fontWeight: 600, ...(idx === currentMonth ? { background: 'var(--accent)', color: 'var(--on-accent)' } : null) }}
-                  >
-                    {m}{byMonth[idx].length > 0 ? ` · ${byMonth[idx].length}` : ''}
-                  </div>
-                  <div className="stack" style={{ gap: 'var(--space-2)' }}>
-                    {byMonth[idx].map((it) => <EventCard key={`${it.kind}-${it.id}`} item={it} />)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {data && items.length === 0 && (
-          <p className="empty">אין עדיין פריטים בציר הזמן של {year}. משימות והוצאות שסומנו "להצגה בציר הזמן" יופיעו כאן.</p>
-        )}
-      </section>
+      <Timeline buildingId={buildingId} isCommittee={isCommittee} complexName={complexName} onNavigate={onNavigate} startYear={now.getFullYear()} startMonth={now.getMonth() + 1} />
     </div>
   );
 }
@@ -170,7 +85,7 @@ function RedLine({ buildingId, balance, onSaved }) {
 }
 
 // ------------------------------------------------------------------------------ next month
-function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpected }) {
+function NextMonth({ buildingId, isCommittee, balance, onNavigate, onPayExpected }) {
   const [data, setData] = useState(null);
   const load = useCallback(() => api.getUpcoming(buildingId, 1).then(setData).catch(() => setData({ tasks: [], expenses: [] })), [buildingId]);
   useEffect(() => { load(); }, [load]);
@@ -188,7 +103,9 @@ function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpecte
     <section className="card stack" style={{ gap: 'var(--space-4)' }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <h2 className="row" style={{ margin: 0 }}><CalendarClock size={22} /> בחודש הקרוב · {data.monthLabel} {data.year}</h2>
-        {isCommittee && data.expectedTotal !== undefined && <span className="chip chip--accent">הוצאות צפויות: {formatILS(data.expectedTotal)}</span>}
+        {isCommittee && data.expectedTotal !== undefined && (
+          <button className="chip chip--accent" onClick={() => onNavigate('expenses', { view: 'expected' })}>הוצאות צפויות: {formatILS(data.expectedTotal)}</button>
+        )}
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-4)' }}>
@@ -197,7 +114,7 @@ function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpecte
           {data.tasks.length === 0 ? <p className="empty" style={{ padding: 'var(--space-3)' }}>אין משימות מתוזמנות לחודש הקרוב</p> : (
             <ul className="list" style={{ background: 'var(--bg-grouped)' }}>
               {data.tasks.map((t) => (
-                <li key={t.id} className="is-link" onClick={onOpenTasks}>
+                <li key={t.id} className="is-link" onClick={() => onNavigate('tasks', { filter: 'OPEN' })}>
                   <div style={{ minWidth: 0 }}>
                     <span style={{ fontWeight: 600 }}>{t.title}</span>
                     <p className="text-footnote text-secondary" style={{ margin: 0 }}>{new Date(t.date).getUTCDate()} ב{data.monthLabel}{t.scope === 'COMPLEX' ? ' · מתחם' : ''}</p>
@@ -218,7 +135,7 @@ function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpecte
             {data.expenses.length === 0 ? <p className="empty" style={{ padding: 'var(--space-3)' }}>אין הוצאות צפויות. אפשר להגדיר אותן במסך "הוצאות".</p> : (
               <ul className="list" style={{ background: 'var(--bg-grouped)' }}>
                 {data.expenses.map((e) => (
-                  <li key={`${e.source}-${e.id}`} style={{ flexWrap: 'wrap' }}>
+                  <li key={`${e.source}-${e.id}`} className="is-link" style={{ flexWrap: 'wrap' }} onClick={() => onNavigate('expenses', { view: 'expected' })}>
                     <div style={{ minWidth: 0 }}>
                       <span style={{ fontWeight: 600 }}>{e.title}</span>
                       <p className="text-footnote text-secondary" style={{ margin: 0 }}>{e.category}{e.source === 'BUDGET' ? ' · מהתקציב השנתי' : ''}</p>
@@ -227,8 +144,8 @@ function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpecte
                       <b>{e.expectedAmount != null ? formatILS(e.expectedAmount) : '—'}</b>
                       {e.handled ? <span className="badge badge--success">שולם</span> : (
                         <>
-                          <button className="btn btn--primary btn--small" onClick={() => onPayExpected?.({ id: e.source === 'RECURRING' ? e.id : null, title: e.title, category: e.category, expectedAmount: e.expectedAmount })}>רישום תשלום</button>
-                          {e.source === 'RECURRING' && !e.hasTask && <button className="btn btn--secondary btn--small" onClick={() => openTask(e)}>פתיחת משימה</button>}
+                          <button className="btn btn--primary btn--small" onClick={(ev) => { ev.stopPropagation(); onPayExpected?.({ id: e.source === 'RECURRING' ? e.id : null, title: e.title, category: e.category, expectedAmount: e.expectedAmount }); }}>רישום תשלום</button>
+                          {e.source === 'RECURRING' && !e.hasTask && <button className="btn btn--secondary btn--small" onClick={(ev) => { ev.stopPropagation(); openTask(e); }}>פתיחת משימה</button>}
                         </>
                       )}
                     </span>
@@ -246,23 +163,226 @@ function NextMonth({ buildingId, isCommittee, balance, onOpenTasks, onPayExpecte
   );
 }
 
-// ------------------------------------------------------------------------------ timeline pieces
-function Kpi({ label, value, dot }) {
+// ------------------------------------------------------------------------------ timeline
+// Opens on the CURRENT month, with arrows to move between months; "השנה כולה" shows all twelve months side
+// by side together with the yearly expense forecast (committee only).
+function Timeline({ buildingId, isCommittee, complexName, onNavigate, startYear, startMonth }) {
+  const [mode, setMode] = useState('month'); // month | year
+  const [cursor, setCursor] = useState({ year: startYear, month: startMonth });
+  const [data, setData] = useState(null);
+  const [forecast, setForecast] = useState(null);
+  const [expected, setExpected] = useState(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const stageRef = useRef(null);
+  const { year, month } = cursor;
+
+  useEffect(() => {
+    setData(null);
+    api.getTimeline(buildingId, year).then(setData).catch(() => setData({ items: [] }));
+    if (isCommittee) api.getForecast(buildingId, year).then(setForecast).catch(() => setForecast(null));
+  }, [buildingId, year, isCommittee]);
+
+  // expected costs of the month being looked at (committee only)
+  useEffect(() => {
+    if (!isCommittee || mode !== 'month') return;
+    setExpected(null);
+    api.getUpcomingMonth(buildingId, year, month).then(setExpected).catch(() => setExpected({ expenses: [] }));
+  }, [buildingId, isCommittee, mode, year, month]);
+
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else stageRef.current?.requestFullscreen?.();
+  };
+
+  const stepMonth = (delta) => setCursor(({ year: y, month: m }) => {
+    const idx = y * 12 + (m - 1) + delta;
+    return { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
+  });
+
+  const items = data?.items || [];
+  const byMonth = useMemo(() => {
+    const months = Array.from({ length: 12 }, () => []);
+    items.forEach((it) => months[new Date(it.date).getMonth()].push(it));
+    return months;
+  }, [items]);
+
+  const tasks = items.filter((i) => i.kind === 'TASK');
+  const open = tasks.filter((t) => t.status !== 'RESOLVED');
+  const urgent = open.filter((t) => t.urgent);
+  const resolved = tasks.filter((t) => t.status === 'RESOLVED');
+  const currentMonth = year === startYear ? startMonth - 1 : -1;
+  const fm = forecast?.months?.[month - 1];
+  const openItem = (it) => (it.kind === 'TASK' ? onNavigate('tasks', { filter: 'ALL' }) : onNavigate('expenses', { view: 'movements' }));
+
+  const title = mode === 'month' ? `${MONTHS_HE[month - 1]} ${year}` : `ציר זמן שנתי ${year}`;
+
   return (
-    <div className="tile">
-      <span className="stat-label row">{dot && <span className={`dot dot--${dot}`} />}{label}</span>
-      <span className="stat-value">{value}</span>
+    <section ref={stageRef} className={`card ${fullscreen ? 'presentation' : ''}`} style={fullscreen ? { overflow: 'auto', borderRadius: 0 } : undefined}>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: fullscreen ? 34 : undefined }}>{title}</h2>
+          <p className="page-sub" style={{ margin: 0 }}>{complexName ? `כולל משימות המתחם "${complexName}"` : 'משימות, תקלות והוצאות לאורך הזמן'}</p>
+        </div>
+        <div className="row no-print" style={{ flexWrap: 'wrap' }}>
+          <div className="segmented">
+            <button aria-pressed={mode === 'month'} onClick={() => setMode('month')}>חודש</button>
+            <button aria-pressed={mode === 'year'} onClick={() => setMode('year')}>השנה כולה</button>
+          </div>
+          <button onClick={() => (mode === 'month' ? stepMonth(-1) : setCursor((c) => ({ ...c, year: c.year - 1 })))} className="icon-btn" aria-label={mode === 'month' ? 'החודש הקודם' : 'שנה קודמת'}><ChevronRight size={20} /></button>
+          <button onClick={() => setCursor({ year: startYear, month: startMonth })} className="btn btn--secondary btn--small">{mode === 'month' ? 'החודש' : 'השנה'}</button>
+          <button onClick={() => (mode === 'month' ? stepMonth(1) : setCursor((c) => ({ ...c, year: c.year + 1 })))} className="icon-btn" aria-label={mode === 'month' ? 'החודש הבא' : 'שנה הבאה'}><ChevronLeft size={20} /></button>
+          <button onClick={toggleFullscreen} className="btn btn--secondary btn--small">
+            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'יציאה' : 'מצב תצוגה'}
+          </button>
+        </div>
+      </div>
+
+      {!data && <p className="empty">טוען...</p>}
+
+      {data && mode === 'month' && (
+        <div className="stack" style={{ gap: 'var(--space-4)' }}>
+          {isCommittee && fm && (
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" className="tile tile--click" onClick={() => onNavigate('expenses', { view: 'expected' })}>
+                <span className="stat-label">מתוכנן ב{MONTHS_HE[month - 1]}</span><span className="stat-value stat-value--md">{formatILS(fm.planned)}</span>
+              </button>
+              <button type="button" className="tile tile--click" onClick={() => onNavigate('expenses', { view: 'movements' })}>
+                <span className="stat-label">שולם בפועל</span><span className="stat-value stat-value--md">{formatILS(fm.actual)}</span>
+              </button>
+            </div>
+          )}
+
+          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+            <h3 style={{ margin: 0 }}>משימות והוצאות בציר</h3>
+            {byMonth[month - 1].length === 0 ? <p className="empty" style={{ padding: 'var(--space-3)' }}>אין פריטים בציר הזמן של החודש. משימות והוצאות שסומנו "להצגה בציר הזמן" יופיעו כאן.</p> : (
+              <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 'var(--space-2)' }}>
+                {byMonth[month - 1].map((it) => <EventCard key={`${it.kind}-${it.id}`} item={it} onClick={() => openItem(it)} />)}
+              </div>
+            )}
+          </div>
+
+          {isCommittee && expected?.expenses?.length > 0 && (
+            <div className="stack" style={{ gap: 'var(--space-2)' }}>
+              <h3 style={{ margin: 0 }}>הוצאות צפויות החודש</h3>
+              <ul className="list" style={{ background: 'var(--bg-grouped)' }}>
+                {expected.expenses.map((e) => (
+                  <li key={`${e.source}-${e.id}`} className="is-link" onClick={() => onNavigate('expenses', { view: 'expected' })}>
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontWeight: 600 }}>{e.title}</span>
+                      <p className="text-footnote text-secondary" style={{ margin: 0 }}>{e.category}{e.source === 'BUDGET' ? ' · מהתקציב השנתי' : ''}</p>
+                    </div>
+                    <span className="row"><b>{e.expectedAmount != null ? formatILS(e.expectedAmount) : '—'}</b>{e.handled && <span className="badge badge--success">שולם</span>}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {data && mode === 'year' && (
+        <div className="stack" style={{ gap: 'var(--space-5)' }}>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Kpi label="משימות פתוחות" value={open.length} onClick={() => onNavigate('tasks', { filter: 'OPEN' })} />
+            <Kpi label="דחופות" value={urgent.length} dot="danger" onClick={() => onNavigate('tasks', { filter: 'URGENT' })} />
+            <Kpi label="הושלמו השנה" value={resolved.length} dot="success" onClick={() => onNavigate('tasks', { filter: 'RESOLVED' })} />
+            <Kpi label="פריטים בציר" value={items.length} onClick={() => onNavigate('tasks', { filter: 'ALL' })} />
+          </div>
+
+          <div className="overflow-x-auto" style={{ paddingBottom: 'var(--space-3)' }}>
+            <div className="grid min-w-[1180px] grid-cols-12 gap-2" style={{ direction: 'rtl' }}>
+              {MONTHS_HE.map((m, idx) => (
+                <div key={m} className="min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => { setCursor({ year, month: idx + 1 }); setMode('month'); }}
+                    className={idx === currentMonth ? 'chip chip--accent' : 'chip'}
+                    style={{ width: '100%', justifyContent: 'center', marginBottom: 'var(--space-2)', fontWeight: 600, cursor: 'pointer', ...(idx === currentMonth ? { background: 'var(--accent)', color: 'var(--on-accent)' } : null) }}
+                    title={`מעבר לחודש ${m}`}
+                  >
+                    {m}{byMonth[idx].length > 0 ? ` · ${byMonth[idx].length}` : ''}
+                  </button>
+                  <div className="stack" style={{ gap: 'var(--space-2)' }}>
+                    {byMonth[idx].map((it) => <EventCard key={`${it.kind}-${it.id}`} item={it} onClick={() => openItem(it)} />)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {items.length === 0 && <p className="empty">אין עדיין פריטים בציר הזמן של {year}. משימות והוצאות שסומנו "להצגה בציר הזמן" יופיעו כאן.</p>}
+
+          {isCommittee && forecast && (
+            <Forecast forecast={forecast} currentMonth={currentMonth} onPickMonth={(m) => { setCursor({ year, month: m }); setMode('month'); }} onOpenPlan={() => onNavigate('expenses', { view: 'expected' })} />
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Planned vs. paid for every month of the year, plus the yearly totals.
+function Forecast({ forecast, currentMonth, onPickMonth, onOpenPlan }) {
+  const max = Math.max(1, ...forecast.months.map((m) => Math.max(m.planned, m.actual)));
+  return (
+    <div className="stack" style={{ gap: 'var(--space-3)' }}>
+      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
+        <h3 className="row" style={{ margin: 0 }}><ListChecks size={20} /> תחזית הוצאות שנתית {forecast.year}</h3>
+        <button className="btn btn--secondary btn--small" onClick={onOpenPlan}>עריכת ההוצאות הצפויות</button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="tile"><span className="stat-label">מתוכנן לשנה</span><span className="stat-value stat-value--md">{formatILS(forecast.plannedTotal)}</span></div>
+        <div className="tile"><span className="stat-label">שולם עד עכשיו</span><span className="stat-value stat-value--md">{formatILS(forecast.actualTotal)}</span></div>
+      </div>
+      <div className="table-wrap">
+        <table className="table">
+          <thead><tr><th>חודש</th><th>מתוכנן</th><th>שולם בפועל</th><th style={{ width: '40%' }} /></tr></thead>
+          <tbody>
+            {forecast.months.map((m, i) => (
+              <tr key={m.month} className="is-link" onClick={() => onPickMonth(m.month)} style={{ cursor: 'pointer', ...(i === currentMonth ? { background: 'var(--accent-tint)' } : null) }}>
+                <td style={{ fontWeight: 600 }}>{MONTHS_HE[i]}</td>
+                <td>{formatILS(m.planned)}</td>
+                <td>{formatILS(m.actual)}</td>
+                <td>
+                  <div style={{ background: 'var(--fill-quiet)', borderRadius: 'var(--radius-pill)', height: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${(m.planned / max) * 100}%`, height: '100%', background: 'var(--accent)', opacity: 0.35 }} />
+                  </div>
+                  <div style={{ marginTop: 3, background: 'var(--fill-quiet)', borderRadius: 'var(--radius-pill)', height: 8, overflow: 'hidden' }}>
+                    <div style={{ width: `${(m.actual / max) * 100}%`, height: '100%', background: 'var(--accent)' }} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-footnote text-secondary" style={{ margin: 0 }}>המתוכנן מחושב מההוצאות הצפויות (חודשיות, שנתיות וחד-פעמיות) ומהתקציב השנתי. לחצו על חודש כדי לראות אותו.</p>
     </div>
   );
 }
 
-function EventCard({ item }) {
+function Kpi({ label, value, dot, onClick }) {
+  return (
+    <button type="button" className="tile tile--click" onClick={onClick}>
+      <span className="stat-label row">{dot && <span className={`dot dot--${dot}`} />}{label}</span>
+      <span className="stat-value">{value}</span>
+    </button>
+  );
+}
+
+function EventCard({ item, onClick }) {
   const isTask = item.kind === 'TASK';
   const st = isTask ? STATUS[item.status] || STATUS.OPEN : null;
   const d = new Date(item.date);
 
   return (
-    <div className="card card--tight" style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--bg-grouped)' }}>
+    <button type="button" onClick={onClick} className="card card--tight tile--click" style={{ padding: 'var(--space-2) var(--space-3)', background: 'var(--bg-grouped)', textAlign: 'start', width: '100%' }}>
       <div className="row" style={{ alignItems: 'flex-start', gap: 'var(--space-2)' }}>
         {isTask ? <span className={`dot dot--${st.dot}`} style={{ marginTop: 6 }} /> : <Receipt size={14} style={{ marginTop: 3 }} color="var(--label-secondary)" />}
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -276,6 +396,6 @@ function EventCard({ item }) {
           </p>
         </div>
       </div>
-    </div>
+    </button>
   );
 }

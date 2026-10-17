@@ -4,6 +4,7 @@ const { getBuilding, getBalance } = require('../lib/calc');
 const { hashPassword } = require('../lib/auth');
 const { generateInviteCode } = require('../lib/inviteCode');
 const { requireCommittee, normalizeBuildingRole } = require('../middleware/auth');
+const { linkUserToTenant, unlinkUser, tenantsByUser } = require('../lib/apartments');
 
 const router = express.Router({ mergeParams: true });
 
@@ -138,11 +139,7 @@ router.get('/admins', async (req, res) => {
     include: { user: true },
     orderBy: { createdAt: 'asc' },
   });
-  const linkedTenants = await prisma.tenant.findMany({
-    where: { buildingId: req.buildingId, userId: { in: memberships.map((m) => m.userId) } },
-    select: { id: true, userId: true, apartmentNumber: true, name: true },
-  });
-  const tenantByUser = new Map(linkedTenants.map((t) => [t.userId, t]));
+  const tenantByUser = await tenantsByUser(req.buildingId, memberships.map((m) => m.userId));
 
   res.json(
     memberships.map((m) => ({
@@ -158,11 +155,7 @@ router.get('/admins', async (req, res) => {
 });
 
 async function linkTenant(buildingId, userId, tenantId) {
-  await prisma.tenant.updateMany({ where: { buildingId, userId }, data: { userId: null } });
-  if (!tenantId) return;
-  const tenant = await prisma.tenant.findFirst({ where: { id: Number(tenantId), buildingId } });
-  if (!tenant) throw Object.assign(new Error('הדירה לא נמצאה'), { status: 404 });
-  await prisma.tenant.update({ where: { id: tenant.id }, data: { userId } });
+  await linkUserToTenant(buildingId, userId, tenantId);
 }
 
 router.post('/admins', async (req, res) => {
@@ -261,7 +254,7 @@ router.delete('/admins/:userId', async (req, res) => {
     if (remaining === 0) return res.status(400).json({ error: 'לא ניתן להסיר את נציג הוועד האחרון של הבניין' });
   }
 
-  await prisma.tenant.updateMany({ where: { buildingId: req.buildingId, userId }, data: { userId: null } });
+  await unlinkUser(req.buildingId, userId);
   await prisma.buildingAdmin.delete({ where: { userId_buildingId: { userId, buildingId: req.buildingId } } });
   res.status(204).end();
 });

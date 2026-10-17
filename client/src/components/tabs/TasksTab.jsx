@@ -13,11 +13,11 @@ const isOpen = (t) => t.status !== 'RESOLVED';
 // Faults and chores. Anyone in the building can open a fault; committee reps run the rest:
 // plan a chore from the expected list, add a one-off, order a contractor, record what it cost
 // (a cost with a payment source is recorded in the expenses automatically).
-export default function TasksTab({ buildingId, isCommittee, onBalanceChanged }) {
+export default function TasksTab({ buildingId, isCommittee, onBalanceChanged, initial }) {
   const [tasks, setTasks] = useState(null);
   const [recurring, setRecurring] = useState([]);
   const [providers, setProviders] = useState([]);
-  const [filter, setFilter] = useState('OPEN'); // OPEN | RESOLVED | ALL | RESIDENT
+  const [filter, setFilter] = useState(initial?.filter || 'OPEN'); // OPEN | URGENT | RESOLVED | ALL | RESIDENT
   const [sheet, setSheet] = useState(null); // { task? } | null
 
   const load = useCallback(async () => {
@@ -33,10 +33,12 @@ export default function TasksTab({ buildingId, isCommittee, onBalanceChanged }) 
     RESOLVED: (tasks || []).filter((t) => !isOpen(t)).length,
     ALL: (tasks || []).length,
     RESIDENT: (tasks || []).filter((t) => t.residentReported && isOpen(t)).length,
+    URGENT: (tasks || []).filter((t) => isOpen(t) && t.urgency === 'דחוף').length,
   }), [tasks]);
 
   const shown = (tasks || []).filter((t) => {
     if (filter === 'OPEN') return isOpen(t);
+    if (filter === 'URGENT') return isOpen(t) && t.urgency === 'דחוף';
     if (filter === 'RESOLVED') return !isOpen(t);
     if (filter === 'RESIDENT') return t.residentReported && isOpen(t);
     return true;
@@ -54,6 +56,7 @@ export default function TasksTab({ buildingId, isCommittee, onBalanceChanged }) 
 
   const filters = [
     ['OPEN', 'פתוחות'],
+    ['URGENT', 'דחופות'],
     ...(isCommittee ? [['RESIDENT', 'תקלות דיירים']] : []),
     ['RESOLVED', 'הושלמו'],
     ['ALL', 'הכל'],
@@ -61,11 +64,7 @@ export default function TasksTab({ buildingId, isCommittee, onBalanceChanged }) 
 
   return (
     <div className="page stack" style={{ gap: 'var(--space-4)' }}>
-      <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>משימות ותקלות</h1>
-          <p className="page-sub" style={{ margin: 0 }}>{isCommittee ? 'תקלות מהדיירים, משימות מתוכננות ובעלי מקצוע' : 'מה קורה בבניין, ופתיחת תקלה חדשה'}</p>
-        </div>
+      <div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <button className="btn btn--primary" onClick={() => setSheet({})}>
           <Plus size={20} /> {isCommittee ? 'משימה או תקלה חדשה' : 'פתיחת תקלה'}
         </button>

@@ -164,3 +164,19 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child {
 .choice-card[aria-pressed='true'] { border-color: var(--accent); background: var(--accent-tint); }
 .choice-card .choice-icon { color: var(--accent); }
 .result-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); text-align: start; }
+
+/* ---------- Votes ---------- */
+.vote-option {
+  position: relative; display: flex; align-items: center; width: 100%; min-height: 44px; overflow: hidden;
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--fill-quiet);
+  border: 2px solid transparent; text-align: start; transition: border-color var(--duration) var(--ease);
+}
+.vote-option:not(:disabled):hover { border-color: var(--accent); }
+.vote-option[aria-pressed='true'] { border-color: var(--accent); }
+.vote-option:disabled { cursor: default; }
+.vote-bar { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--accent-tint); transition: width 0.4s var(--ease); }
+
+/* Tiles that act as buttons (dashboard numbers open the matching screen) */
+button.tile { text-align: start; width: 100%; border: 0; font: inherit; color: inherit; cursor: pointer; transition: transform var(--duration) var(--ease), background var(--duration) var(--ease); }
+.tile--click:hover { transform: translateY(-2px); }
+.tile--click:active { transform: scale(0.98); }

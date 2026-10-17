@@ -7,6 +7,7 @@ import SuggestionsAdminModal from './SuggestionsAdminModal';
 import AdminControlCenterModal from './AdminControlCenterModal';
 import JoinOrCreate from './JoinOrCreate';
 import Sheet from './Sheet';
+import ShareButton from './ShareButton';
 
 export default function BuildingSelector({ user, buildings, onSelect, onLogout, onBuildingsChanged }) {
   const [showCreate, setShowCreate] = useState(false);
@@ -39,7 +40,10 @@ export default function BuildingSelector({ user, buildings, onSelect, onLogout, 
           <h3 style={{ margin: 0 }}>שלום, {user.name}</h3>
           <p className="text-footnote text-secondary" style={{ margin: 0 }}>בחרו בניין לניהול</p>
         </div>
-        <button onClick={onLogout} className="icon-btn" title="התנתקות" aria-label="התנתקות"><LogOut size={20} /></button>
+        <div className="row">
+          <ShareButton />
+          <button onClick={onLogout} className="icon-btn" title="התנתקות" aria-label="התנתקות"><LogOut size={20} /></button>
+        </div>
       </header>
 
       <div className="page stack" style={{ maxWidth: 560 }}>

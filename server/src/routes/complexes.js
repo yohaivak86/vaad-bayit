@@ -532,7 +532,23 @@ router.get('/:id/profile', async (req, res) => {
     orderBy: { name: 'asc' },
   });
 
+  // The elected committee reps ("נציגי הוועד") of every building in the complex.
+  const committee = await prisma.buildingAdmin.findMany({
+    where: { buildingId: { in: complex.members.map((m) => m.buildingId) }, role: { in: ['COMMITTEE', 'ADMIN'] }, status: 'ACTIVE' },
+    include: { user: { select: { name: true, phone: true } } },
+    orderBy: { createdAt: 'asc' },
+  });
+  const buildingName = new Map(complex.members.map((m) => [m.buildingId, m.building.name]));
+
   res.json({
+    committee: committee.map((m) => ({
+      userId: m.userId,
+      name: m.user.name,
+      phone: m.user.phone,
+      buildingId: m.buildingId,
+      buildingName: buildingName.get(m.buildingId),
+      isComplexManager: m.userId === complex.ownerId,
+    })),
     complex: { id: complex.id, number: complex.number, name: complex.name, address: complex.address, ownerName: complex.owner?.name },
     canEdit: isOwner(complex, req.user),
     buildings: complex.members.map((m) => ({

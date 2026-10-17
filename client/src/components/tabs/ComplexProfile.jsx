@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Network, Plus, Trash2, AlertTriangle, Wallet, CalendarClock, X, Building2 } from 'lucide-react';
+import { Network, Plus, Trash2, AlertTriangle, Wallet, CalendarClock, X, Building2, UserCheck, Phone } from 'lucide-react';
 import { api } from '../../api';
 import { TASK_STATUSES } from '../../constants';
 import { formatDateHe } from '../../format';
@@ -62,6 +62,26 @@ export default function ComplexProfile({ complexId, currentBuildingId, canFinanc
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card p-5">
+        <h3 className="mb-3 flex items-center gap-2 text-base font-extrabold text-slate-800"><UserCheck size={18} /> נציגי הוועד הנבחרים</h3>
+        {profile.committee?.length ? (
+          <ul className="list">
+            {profile.committee.map((m) => (
+              <li key={`${m.buildingId}-${m.userId}`}>
+                <div className="min-w-0">
+                  <span style={{ fontWeight: 600 }}>{m.name}</span>
+                  {m.isComplexManager && <span className="badge" style={{ marginInlineStart: 'var(--space-2)' }}>מנהל המתחם</span>}
+                  <p className="text-footnote text-secondary" style={{ margin: 0 }}>נציג ועד · {m.buildingName}</p>
+                </div>
+                {m.phone && <a href={`tel:${m.phone}`} className="btn btn--secondary btn--small" dir="ltr"><Phone size={14} /> {m.phone}</a>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="empty">עדיין לא נבחרו נציגי ועד.</p>
+        )}
       </div>
 
       <div className="card p-5">

@@ -8,9 +8,13 @@ const router = express.Router({ mergeParams: true });
 // Tasks are visible to every role; expected costs (planned recurring items + annual budget lines)
 // only to committee reps.
 router.get('/', async (req, res) => {
-  const offset = Math.min(Math.max(Number(req.query.offset ?? 1) || 0, 0), 12);
   const now = new Date();
-  const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  // Either an explicit month (?month=2026-11) or an offset from the current one (default: next month).
+  const explicit = /^(\d{4})-(\d{1,2})$/.exec(String(req.query.month || ''));
+  const offset = Math.min(Math.max(Number(req.query.offset ?? 1) || 0, 0), 12);
+  const target = explicit && Number(explicit[2]) >= 1 && Number(explicit[2]) <= 12
+    ? new Date(Date.UTC(Number(explicit[1]), Number(explicit[2]) - 1, 1))
+    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
   const year = target.getUTCFullYear();
   const month = target.getUTCMonth() + 1;
   const start = target;

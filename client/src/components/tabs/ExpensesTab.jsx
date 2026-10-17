@@ -20,8 +20,8 @@ function today() {
 // Two views of the money, one primary action:
 //   "תנועות"          - what was actually paid (edit / delete / receipt, any time)
 //   "הוצאות צפויות"   - what is planned: monthly, annual and one-time items, loaded by hand or from Excel
-export default function ExpensesTab({ buildingId, building, onBalanceChanged }) {
-  const [view, setView] = useState('movements'); // movements | expected
+export default function ExpensesTab({ buildingId, building, onBalanceChanged, initial }) {
+  const [view, setView] = useState(initial?.view || 'movements'); // movements | expected
   const [expenseSheet, setExpenseSheet] = useState(null); // { expense?, prefill? } | null
   const [loadVersion, setLoadVersion] = useState(0);
 
@@ -39,11 +39,7 @@ export default function ExpensesTab({ buildingId, building, onBalanceChanged }) 
 
   return (
     <div className="page stack" style={{ gap: 'var(--space-4)' }}>
-      <div className="row no-print" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-        <div>
-          <h1 className="page-title" style={{ margin: 0 }}>הוצאות</h1>
-          <p className="page-sub" style={{ margin: 0 }}>מה שולם, ומה צפוי בחודשים הקרובים</p>
-        </div>
+      <div className="row no-print" style={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
         <button className="btn btn--primary" onClick={() => setExpenseSheet({})}><Plus size={20} /> הוצאה חדשה</button>
       </div>
 
@@ -57,6 +53,7 @@ export default function ExpensesTab({ buildingId, building, onBalanceChanged }) 
           key={`m-${loadVersion}`}
           buildingId={buildingId}
           building={building}
+          initialPaidFrom={initial?.paidFrom}
           onEdit={(expense) => setExpenseSheet({ expense })}
           onChanged={changed}
         />
@@ -82,8 +79,8 @@ export default function ExpensesTab({ buildingId, building, onBalanceChanged }) 
 }
 
 // ------------------------------------------------------------------------------ movements
-function Movements({ buildingId, building, onEdit, onChanged }) {
-  const [filters, setFilters] = useState({ from: firstOfMonth(), to: today(), category: '', paidFrom: '' });
+function Movements({ buildingId, building, onEdit, onChanged, initialPaidFrom }) {
+  const [filters, setFilters] = useState({ from: initialPaidFrom ? `${new Date().getFullYear()}-01-01` : firstOfMonth(), to: today(), category: '', paidFrom: initialPaidFrom || '' });
   const [expenses, setExpenses] = useState(null);
   const [summary, setSummary] = useState(null);
   const [receiptExpense, setReceiptExpense] = useState(null);

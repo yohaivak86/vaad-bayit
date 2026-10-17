@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 
-const { requireAuth, requireBuildingAccess, blockResidentWrites, requireCommittee } = require('./middleware/auth');
+const { requireAuth, requireBuildingAccess, blockResidentWrites, requireCommittee, committeeWritesOnly } = require('./middleware/auth');
 const meRoutes = require('./routes/me');
 const timelineRoutes = require('./routes/timeline');
 const providersRoutes = require('./routes/providers');
@@ -28,6 +28,7 @@ const suggestionsRoutes = require('./routes/suggestions');
 const adminRoutes = require('./routes/admin');
 const recurringRoutes = require('./routes/recurring');
 const upcomingRoutes = require('./routes/upcoming');
+const pollsRoutes = require('./routes/polls');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -59,14 +60,16 @@ buildingScope.use('/providers', providersRoutes);
 buildingScope.use('/tasks', tasksRoutes);
 buildingScope.use('/announcements', announcementsRoutes);
 buildingScope.use('/upcoming', upcomingRoutes);
+buildingScope.use('/polls', pollsRoutes);
+// Protocols, committee summaries and building procedures: everyone reads, the committee writes.
+buildingScope.use('/minutes', committeeWritesOnly, minutesRoutes);
+buildingScope.use('/procedures', committeeWritesOnly, proceduresRoutes);
 // Everything about other residents or money: committee reps (and the site admin) only.
 buildingScope.use('/tenants', requireCommittee, tenantsRoutes);
 buildingScope.use('/dues', requireCommittee, duesRoutes);
 buildingScope.use('/expenses', requireCommittee, expensesRoutes);
 buildingScope.use('/budget', requireCommittee, budgetRoutes);
 buildingScope.use('/recurring', requireCommittee, recurringRoutes);
-buildingScope.use('/minutes', requireCommittee, minutesRoutes);
-buildingScope.use('/procedures', requireCommittee, proceduresRoutes);
 
 app.use('/api/buildings/:buildingId', requireAuth, requireBuildingAccess, blockResidentWrites, buildingScope);
 

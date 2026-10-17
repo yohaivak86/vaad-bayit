@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  CalendarRange, UserRound, Users, ClipboardList, Receipt, LineChart, FileText, Building2, Network,
+  CalendarRange, UserRound, Users, ClipboardList, Receipt, LineChart, FileText, Building2, Network, Vote, ArrowRight,
 } from 'lucide-react';
 import AppShell from './components/AppShell';
 import OnboardingModal from './components/OnboardingModal';
@@ -22,30 +22,53 @@ import TasksTab from './components/tabs/TasksTab';
 import ExpensesTab from './components/tabs/ExpensesTab';
 import BudgetTab from './components/tabs/BudgetTab';
 import DocumentsTab from './components/tabs/DocumentsTab';
+import VotesTab from './components/tabs/VotesTab';
 import BuildingProfile from './components/tabs/BuildingProfile';
 import ComplexProfile from './components/tabs/ComplexProfile';
 import { api } from './api';
 import { createExpenseFromForm } from './lib/expenseSave';
 
+// `label` is the sidebar entry AND the title shown at the top of the screen; `sub` is the line under it.
 const NAV_ITEMS = {
-  dashboard: { label: 'ציר זמן ולוח בקרה', icon: CalendarRange },
-  me: { label: 'הדף שלי', icon: UserRound },
-  tenants: { label: 'דיירים וגבייה', icon: Users },
-  tasks: { label: 'משימות ותקלות', icon: ClipboardList },
-  expenses: { label: 'הוצאות ותנועות', icon: Receipt },
-  budget: { label: 'תכנון שנתי', icon: LineChart },
-  documents: { label: 'מסמכים ונהלים', icon: FileText },
-  building: { label: 'פרופיל בניין', icon: Building2 },
-  complex: { label: 'פרופיל מתחם', icon: Network },
+  dashboard: { label: 'מסך ראשי', sub: 'הקופה, מה מצפה בחודש הקרוב, והציר השנתי', subResident: 'מה מצפה בחודש הקרוב והציר השנתי', icon: CalendarRange },
+  me: { label: 'הדף שלי', sub: 'הפרטים שלי ודמי הוועד', icon: UserRound },
+  tenants: { label: 'דיירים וגבייה', sub: 'דמי ועד, תשלומים וחובות', icon: Users },
+  tasks: { label: 'משימות ותקלות', sub: 'תקלות מהדיירים, משימות מתוכננות ובעלי מקצוע', subResident: 'מה קורה בבניין, ופתיחת תקלה חדשה', icon: ClipboardList },
+  expenses: { label: 'הוצאות', sub: 'מה שולם, ומה צפוי בחודשים הקרובים', icon: Receipt },
+  budget: { label: 'תכנון שנתי', sub: 'תקציב והקרנת הקופה', icon: LineChart },
+  documents: { label: 'פרוטוקולים ונהלים', sub: 'פרוטוקולים וסיכומי ועד, ונהלי הבניין', icon: FileText },
+  votes: { label: 'הצבעות', sub: 'קול אחד לכל דירה', icon: Vote },
+  building: { label: 'פרופיל בניין', sub: 'פרטי הבניין, שיוך למתחם ובעלי מקצוע', icon: Building2 },
+  complex: { label: 'פרופיל מתחם', sub: 'הבניינים, נציגי הוועד ובעלי המקצוע של המתחם', icon: Network },
 };
 
-// What each level sees. A resident gets only their own page, the timeline, the tasks and the
-// profiles - never money or other residents. Committee reps / the site admin get everything.
+// What each level sees. A resident gets only their own page, the timeline, the tasks, the documents, the
+// votes and the profiles - never money or other residents. Committee reps / the site admin get everything.
 function navKeysFor(role, inComplex) {
   const keys = role === 'COMMITTEE'
-    ? ['dashboard', ...(inComplex ? ['complex'] : []), 'tenants', 'tasks', 'expenses', 'budget', 'documents', 'building']
-    : ['me', 'dashboard', 'tasks', 'building', ...(inComplex ? ['complex'] : [])];
+    ? ['dashboard', ...(inComplex ? ['complex'] : []), 'tenants', 'tasks', 'expenses', 'budget', 'documents', 'votes', 'building']
+    : ['me', 'dashboard', 'tasks', 'votes', 'documents', 'building', ...(inComplex ? ['complex'] : [])];
   return keys;
+}
+
+// The title of the screen the user is on, with a back button to the screen they came from.
+function PageHeader({ item, resident, canGoBack, onBack }) {
+  if (!item) return null;
+  return (
+    <div className="page no-print" style={{ paddingBottom: 0 }}>
+      <div className="row" style={{ alignItems: 'flex-start', gap: 'var(--space-3)' }}>
+        {canGoBack && (
+          <button className="icon-btn" onClick={onBack} aria-label="חזרה למסך הקודם" title="חזרה למסך הקודם" style={{ marginInlineStart: 'calc(var(--space-2) * -1)' }}>
+            <ArrowRight size={22} />
+          </button>
+        )}
+        <div style={{ minWidth: 0 }}>
+          <h1 className="page-title" style={{ margin: 0 }}>{item.label}</h1>
+          <p className="page-sub" style={{ margin: 0 }}>{resident && item.subResident ? item.subResident : item.sub}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -55,7 +78,19 @@ export default function App() {
 
   const [building, setBuilding] = useState(null);
   const [balance, setBalance] = useState(null);
-  const [tab, setTab] = useState('dashboard');
+  const [route, setRoute] = useState({ tab: 'dashboard', params: null, depth: 0 });
+  const tab = route.tab;
+  // programmatic redirects (no history entry)
+  const setTab = useCallback((t) => setRoute((r) => ({ ...r, tab: t, params: null })), []);
+  // user navigation: remembered, so "back" works
+  const go = useCallback((t, params = null) => {
+    setRoute((r) => {
+      const next = { tab: t, params, depth: r.depth + 1 };
+      window.history.pushState(next, '');
+      return next;
+    });
+  }, []);
+  const goBack = () => window.history.back();
   const [showSettings, setShowSettings] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [showApprovePayment, setShowApprovePayment] = useState(false);
@@ -67,6 +102,13 @@ export default function App() {
 
   useEffect(() => {
     api.me().then((res) => setUser(res.user)).catch(() => setUser(null));
+  }, []);
+
+  useEffect(() => {
+    window.history.replaceState({ tab: 'dashboard', params: null, depth: 0 }, '');
+    const onPop = (e) => { if (e.state?.tab) setRoute(e.state); };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
   }, []);
 
   const loadBuildings = useCallback(async () => {
@@ -89,7 +131,11 @@ export default function App() {
 
   // Land on the right page for the role whenever a building is opened.
   useEffect(() => {
-    if (buildingId) setTab(role === 'COMMITTEE' ? 'dashboard' : 'me');
+    if (buildingId) {
+      const first = { tab: role === 'COMMITTEE' ? 'dashboard' : 'me', params: null, depth: 0 };
+      window.history.replaceState(first, '');
+      setRoute(first);
+    }
   }, [buildingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // If the role or complex membership changes, never leave the user on a page they can't see.
@@ -179,7 +225,7 @@ export default function App() {
       isSiteAdmin={isSiteAdmin}
       nav={nav}
       active={tab}
-      onNav={setTab}
+      onNav={(key) => go(key)}
       complex={complex}
       showSwitch={buildings && (buildings.length > 1 || isSiteAdmin)}
       onSwitchBuilding={() => setBuildingId(null)}
@@ -188,10 +234,13 @@ export default function App() {
       onApprovePayment={() => setShowApprovePayment(true)}
       onManageAdmins={() => setShowManageAdmins(true)}
       onOpenSettings={() => setShowSettings(true)}
+      inviteCode={isCommittee ? building?.inviteCode : null}
       onOpenProfessionals={() => setShowProfessionals(true)}
     >
       {isCommittee && <ComplexRequests onChanged={loadBuildings} />}
       <AnnouncementsBoard buildingId={buildingId} readOnly={!isCommittee} />
+
+      <PageHeader item={NAV_ITEMS[tab]} resident={!isCommittee} canGoBack={route.depth > 0} onBack={goBack} />
 
       {tab === 'dashboard' && <TimelineDashboard
           key={`dash-${version}`}
@@ -200,21 +249,22 @@ export default function App() {
           balance={balance}
           complexName={complex?.name}
           onBalanceChanged={refreshBalance}
-          onOpenTasks={() => setTab('tasks')}
+          onNavigate={go}
           onPayExpected={(item) => { setExpensePrefill(item); setShowAddExpense(true); }}
         />}
       {tab === 'me' && <MyPage buildingId={buildingId} />}
       {tab === 'tenants' && isCommittee && <TenantsTab buildingId={buildingId} onBalanceChanged={refreshBalance} readOnly={false} />}
-      {tab === 'tasks' && <TasksTab buildingId={buildingId} isCommittee={isCommittee} onBalanceChanged={refreshBalance} />}
-      {tab === 'expenses' && isCommittee && <ExpensesTab key={`exp-${version}`} buildingId={buildingId} building={building} onBalanceChanged={refreshBalance} />}
+      {tab === 'tasks' && <TasksTab key={JSON.stringify(route.params)} buildingId={buildingId} isCommittee={isCommittee} initial={route.params} onBalanceChanged={refreshBalance} />}
+      {tab === 'expenses' && isCommittee && <ExpensesTab key={`exp-${version}-${JSON.stringify(route.params)}`} initial={route.params} buildingId={buildingId} building={building} onBalanceChanged={refreshBalance} />}
       {tab === 'budget' && isCommittee && <BudgetTab buildingId={buildingId} readOnly={false} />}
-      {tab === 'documents' && isCommittee && <DocumentsTab buildingId={buildingId} readOnly={false} />}
+      {tab === 'documents' && <DocumentsTab buildingId={buildingId} readOnly={!isCommittee} />}
+      {tab === 'votes' && <VotesTab buildingId={buildingId} isCommittee={isCommittee} />}
       {tab === 'building' && (
         <BuildingProfile
           buildingId={buildingId}
           canEdit={isCommittee}
           onChanged={loadBuildings}
-          onOpenComplex={() => setTab('complex')}
+          onOpenComplex={() => go('complex')}
         />
       )}
       {tab === 'complex' && complex && (
@@ -227,7 +277,14 @@ export default function App() {
       )}
 
       {showSettings && isCommittee && (
-        <OnboardingModal building={building} onClose={() => setShowSettings(false)} onSave={saveSettings} />
+        <OnboardingModal
+          building={building}
+          buildingId={buildingId}
+          complex={complex}
+          onClose={() => setShowSettings(false)}
+          onSave={saveSettings}
+          onComplexChanged={loadBuildings}
+        />
       )}
       {showAddExpense && <AddExpenseModal prefill={expensePrefill} onClose={() => { setShowAddExpense(false); setExpensePrefill(null); }} onSave={saveExpense} />}
       {showApprovePayment && (
