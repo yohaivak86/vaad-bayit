@@ -349,7 +349,6 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child { background: #fff; bo
 }
 
 /* On the big screen: larger type for the back of the room */
-.tl-presentation .tl { min-width: 0; }
 .tl-presentation .tl-card { font-size: 16px; }
 .tl-presentation .tl-line-item { font-size: 15px; }
 .tl-presentation .tl-month { font-size: 19px; height: 48px; }
@@ -361,4 +360,54 @@ div.fixed.inset-0[class*='bg-black/40'] > div:first-child { background: #fff; bo
   .tl { min-width: 0; grid-template-columns: repeat(4, 1fr); row-gap: var(--space-4); }
   .tl-line, .tl-today { display: none; }
   .tl-card { box-shadow: none; border: 1px solid #e2e8f0; border-inline-start: 5px solid var(--c); }
+}
+
+/* =====================================================================================================
+   PHONE: rows stay on ONE line - the title shrinks with an ellipsis, the amount stays, the action buttons
+   become icons. (Labels marked .hide-mobile disappear under 640px.)
+   ===================================================================================================== */
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.nowrap { white-space: nowrap; }
+.shrink-0 { flex-shrink: 0; }
+
+@media (max-width: 639px) {
+  .hide-mobile { display: none !important; }
+  .page { padding-inline: var(--space-3); }
+  .list > li { gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+  .list > li.row-1 { flex-wrap: nowrap; }
+  .btn--small.btn-icon-mobile { padding: 0; width: 36px; min-width: 36px; min-height: 36px; border-radius: 10px; }
+  .card { padding: var(--space-4); }
+  .card--tight { padding: var(--space-3); }
+  .stat-value { font-size: 26px; line-height: 32px; }
+  .stat-value--md { font-size: 19px; line-height: 24px; }
+  .table th, .table td { padding: var(--space-2) var(--space-2); }
+  .page-title { font-size: 28px; line-height: 34px; }
+  /* control bars (month / year pickers, view switches) scroll sideways instead of wrapping onto more lines */
+  .bar-1 { flex-wrap: nowrap !important; overflow-x: auto; max-width: 100%; padding-bottom: 2px; }
+  .bar-1 > * { flex-shrink: 0; }
+}
+
+/* =====================================================================================================
+   TIMELINE DISPLAY MODE: the same horizontal timeline on every device (phone, tablet, computer).
+   `.tl--h` forces the horizontal layout even where the narrow-screen rules would turn it vertical; the
+   display mode is an overlay over the whole screen, so it also works where the browser has no fullscreen.
+   ===================================================================================================== */
+.tl-presentation { position: fixed; inset: 0; z-index: 80; overflow: auto; border-radius: 0; margin: 0; }
+.tl--h { grid-template-columns: repeat(12, minmax(160px, 1fr)); min-width: 1920px; }
+.tl--h .tl-line { inset-inline: 0; inset-inline-start: 0; top: 31px; bottom: auto; width: auto; height: 6px; background: linear-gradient(90deg, #3b82f6, #8b5cf6, #10b981); }
+.tl--h .tl-col { padding: 0 var(--space-2); }
+.tl--h .tl-col::before { display: none; }
+.tl--h .tl-node { flex-direction: column; align-items: center; justify-content: center; flex-wrap: nowrap; }
+.tl--h .tl-today { inset-inline: auto; inset-inline-start: var(--today); width: 3px; top: 0; bottom: 0; height: auto; }
+.tl--h .tl-today span { top: -2px; left: 50%; right: auto; transform: translateX(-50%); }
+
+/* the title + exit button stay pinned while the timeline scrolls (display mode) */
+.tl-presentation .tl-head { position: sticky; top: calc(var(--space-5) * -1); z-index: 6; margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) var(--space-3); padding: var(--space-3) var(--space-5); background: #0b1f44; box-shadow: 0 8px 18px -10px rgba(0, 0, 0, 0.6); }
+.tl-presentation .tl-head .page-sub { color: #bfdbfe; }
+@media (max-width: 639px) { .tl-presentation .tl-head h2 { font-size: 22px !important; } .tl-presentation { padding: var(--space-3) !important; } .tl-presentation .tl-head { margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) var(--space-2); padding: var(--space-2) var(--space-3); top: calc(var(--space-3) * -1); } }
+
+@media (max-width: 639px) {
+  .segmented { flex-wrap: nowrap !important; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .segmented::-webkit-scrollbar { display: none; }
+  .segmented button { white-space: nowrap; flex-shrink: 0; padding-inline: var(--space-3); }
 }

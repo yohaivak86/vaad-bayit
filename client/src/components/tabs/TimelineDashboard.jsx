@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronRight, ChevronLeft, Maximize2, Minimize2, Receipt, Network, CalendarClock, ShieldAlert, Pencil, Check, TriangleAlert, ListChecks,
+  ChevronRight, ChevronLeft, Maximize2, Minimize2, Receipt, Network, CalendarClock, ShieldAlert, Pencil, Check, TriangleAlert, ListChecks, Banknote, ClipboardPlus,
 } from 'lucide-react';
 import { api } from '../../api';
 import { MONTHS_HE, formatILS } from '../../format';
@@ -102,7 +102,7 @@ function NextMonth({ buildingId, isCommittee, balance, onNavigate, onPayExpected
   return (
     <section className="card stack" style={{ gap: 'var(--space-4)' }}>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <h2 className="row" style={{ margin: 0 }}><CalendarClock size={22} /> בחודש הקרוב · {data.monthLabel} {data.year}</h2>
+        <h2 className="row ellipsis" style={{ margin: 0, minWidth: 0 }}><CalendarClock size={22} className="shrink-0" /> <span className="ellipsis">בחודש הקרוב · {data.monthLabel} {data.year}</span></h2>
         {isCommittee && data.expectedTotal !== undefined && (
           <button className="chip chip--accent" onClick={() => onNavigate('expenses', { view: 'expected' })}>הוצאות צפויות: {formatILS(data.expectedTotal)}</button>
         )}
@@ -114,12 +114,13 @@ function NextMonth({ buildingId, isCommittee, balance, onNavigate, onPayExpected
           {data.tasks.length === 0 ? <p className="empty" style={{ padding: 'var(--space-3)' }}>אין משימות מתוזמנות לחודש הקרוב</p> : (
             <ul className="list" style={{ background: 'var(--bg-grouped)' }}>
               {data.tasks.map((t) => (
-                <li key={t.id} className="is-link" onClick={() => onNavigate('tasks', { filter: 'OPEN' })}>
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontWeight: 600 }}>{t.title}</span>
-                    <p className="text-footnote text-secondary" style={{ margin: 0 }}>{new Date(t.date).getUTCDate()} ב{data.monthLabel}{t.scope === 'COMPLEX' ? ' · מתחם' : ''}</p>
+                <li key={t.id} className="is-link row-1" onClick={() => onNavigate('tasks', { filter: 'OPEN' })}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span className="ellipsis" style={{ fontWeight: 600, display: 'block' }}>{t.title}</span>
+                    <p className="text-footnote text-secondary hide-mobile" style={{ margin: 0 }}>{new Date(t.date).getUTCDate()} ב{data.monthLabel}{t.scope === 'COMPLEX' ? ' · מתחם' : ''}</p>
                   </div>
-                  <span className="row">
+                  <span className="row shrink-0" style={{ gap: 'var(--space-1)' }}>
+                    <span className="text-footnote text-secondary nowrap">{new Date(t.date).getUTCDate()}.{data.month}</span>
                     {t.urgent && <span className="badge badge--danger">דחוף</span>}
                     <span className={`badge badge--${STATUS[t.status]?.dot || 'danger'}`}>{STATUS[t.status]?.label}</span>
                   </span>
@@ -135,17 +136,17 @@ function NextMonth({ buildingId, isCommittee, balance, onNavigate, onPayExpected
             {data.expenses.length === 0 ? <p className="empty" style={{ padding: 'var(--space-3)' }}>אין הוצאות צפויות. אפשר להגדיר אותן במסך "הוצאות".</p> : (
               <ul className="list" style={{ background: 'var(--bg-grouped)' }}>
                 {data.expenses.map((e) => (
-                  <li key={`${e.source}-${e.id}`} className="is-link" style={{ flexWrap: 'wrap' }} onClick={() => onNavigate('expenses', { view: 'expected' })}>
-                    <div style={{ minWidth: 0 }}>
-                      <span style={{ fontWeight: 600 }}>{e.title}</span>
-                      <p className="text-footnote text-secondary" style={{ margin: 0 }}>{e.category}{e.source === 'BUDGET' ? ' · מהתקציב השנתי' : ''}</p>
+                  <li key={`${e.source}-${e.id}`} className="is-link row-1" onClick={() => onNavigate('expenses', { view: 'expected' })}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <span className="ellipsis" style={{ fontWeight: 600, display: 'block' }}>{e.title}</span>
+                      <p className="text-footnote text-secondary hide-mobile" style={{ margin: 0 }}>{e.category}{e.source === 'BUDGET' ? ' · מהתקציב השנתי' : ''}</p>
                     </div>
-                    <span className="row" style={{ flexWrap: 'wrap' }}>
-                      <b>{e.expectedAmount != null ? formatILS(e.expectedAmount) : '—'}</b>
+                    <span className="row shrink-0" style={{ gap: 'var(--space-2)' }}>
+                      <b className="nowrap">{e.expectedAmount != null ? formatILS(e.expectedAmount) : '—'}</b>
                       {e.handled ? <span className="badge badge--success">שולם</span> : (
                         <>
-                          <button className="btn btn--primary btn--small" onClick={(ev) => { ev.stopPropagation(); onPayExpected?.({ id: e.source === 'RECURRING' ? e.id : null, title: e.title, category: e.category, expectedAmount: e.expectedAmount }); }}>רישום תשלום</button>
-                          {e.source === 'RECURRING' && !e.hasTask && <button className="btn btn--secondary btn--small" onClick={(ev) => { ev.stopPropagation(); openTask(e); }}>פתיחת משימה</button>}
+                          <button className="btn btn--primary btn--small btn-icon-mobile" aria-label="רישום תשלום" title="רישום תשלום" onClick={(ev) => { ev.stopPropagation(); onPayExpected?.({ id: e.source === 'RECURRING' ? e.id : null, title: e.title, category: e.category, expectedAmount: e.expectedAmount }); }}><Banknote size={16} /> <span className="hide-mobile">רישום תשלום</span></button>
+                          {e.source === 'RECURRING' && !e.hasTask && <button className="btn btn--secondary btn--small btn-icon-mobile" aria-label="פתיחת משימה" title="פתיחת משימה" onClick={(ev) => { ev.stopPropagation(); openTask(e); }}><ClipboardPlus size={16} /> <span className="hide-mobile">פתיחת משימה</span></button>}
                         </>
                       )}
                     </span>
@@ -229,7 +230,7 @@ function Timeline({ buildingId, isCommittee, complexName, onNavigate, startYear,
           <h2 style={{ margin: 0, fontSize: fullscreen ? 34 : undefined }}>{title}</h2>
           <p className="page-sub" style={{ margin: 0 }}>{complexName ? `כולל משימות המתחם "${complexName}"` : 'משימות, תקלות והוצאות לאורך הזמן'}</p>
         </div>
-        <div className="row no-print" style={{ flexWrap: 'wrap' }}>
+        <div className="row no-print bar-1" style={{ flexWrap: 'wrap' }}>
           <div className="segmented">
             <button aria-pressed={mode === 'month'} onClick={() => setMode('month')}>חודש</button>
             <button aria-pressed={mode === 'year'} onClick={() => setMode('year')}>השנה כולה</button>
@@ -237,8 +238,8 @@ function Timeline({ buildingId, isCommittee, complexName, onNavigate, startYear,
           <button onClick={() => (mode === 'month' ? stepMonth(-1) : setCursor((c) => ({ ...c, year: c.year - 1 })))} className="icon-btn" aria-label={mode === 'month' ? 'החודש הקודם' : 'שנה קודמת'}><ChevronRight size={20} /></button>
           <button onClick={() => setCursor({ year: startYear, month: startMonth })} className="btn btn--secondary btn--small">{mode === 'month' ? 'החודש' : 'השנה'}</button>
           <button onClick={() => (mode === 'month' ? stepMonth(1) : setCursor((c) => ({ ...c, year: c.year + 1 })))} className="icon-btn" aria-label={mode === 'month' ? 'החודש הבא' : 'שנה הבאה'}><ChevronLeft size={20} /></button>
-          <button onClick={toggleFullscreen} className="btn btn--secondary btn--small">
-            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'יציאה' : 'מצב תצוגה'}
+          <button onClick={toggleFullscreen} className="btn btn--secondary btn--small btn-icon-mobile" aria-label={fullscreen ? 'יציאה ממצב תצוגה' : 'מצב תצוגה'}>
+            {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} <span className="hide-mobile">{fullscreen ? 'יציאה' : 'מצב תצוגה'}</span>
           </button>
         </div>
       </div>

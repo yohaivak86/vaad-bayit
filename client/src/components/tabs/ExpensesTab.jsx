@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Trash2, Printer, Paperclip, Upload, Pencil, Plus, FileSpreadsheet, ClipboardPlus, Wallet, Link2, Network, Repeat } from 'lucide-react';
+import { Trash2, Printer, Paperclip, Upload, Pencil, Plus, FileSpreadsheet, ClipboardPlus, Wallet, Link2, Network, Repeat, Banknote, ListPlus } from 'lucide-react';
 import { api } from '../../api';
 import { EXPENSE_CATEGORIES, PAID_FROM_OPTIONS } from '../../constants';
 import { formatILS, formatDateHe } from '../../format';
@@ -270,17 +270,18 @@ function Expected({ buildingId, onPay, onChanged }) {
             <h2 style={{ margin: 0 }}>{title}</h2>
             <ul className="list">
               {rows.map((item) => (
-                <li key={item.id} style={{ opacity: item.active ? 1 : 0.5, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                <li key={item.id} className="row-1" style={{ opacity: item.active ? 1 : 0.5 }}>
                   <div style={{ minWidth: 0, flex: 1 }}>
-                    <h3 style={{ margin: 0 }}>{item.title}</h3>
-                    <p className="text-footnote text-secondary" style={{ margin: 0 }}>
-                      {item.category} · {describeSchedule(item)}{item.expectedAmount != null ? ` · ${formatILS(item.expectedAmount)}` : ''}
-                      {item.tasksCount > 0 ? ` · ${item.tasksCount} משימות` : ''}{item.expensesCount > 0 ? ` · ${item.expensesCount} תשלומים` : ''}
+                    <h3 className="ellipsis" style={{ margin: 0 }}>{item.title}</h3>
+                    <p className="text-footnote text-secondary ellipsis" style={{ margin: 0 }}>
+                      {item.category} · {describeSchedule(item)}
+                      <span className="hide-mobile">{item.tasksCount > 0 ? ` · ${item.tasksCount} משימות` : ''}{item.expensesCount > 0 ? ` · ${item.expensesCount} תשלומים` : ''}</span>
                     </p>
                   </div>
-                  <div className="row no-print" style={{ flexWrap: 'wrap' }}>
-                    <button className="btn btn--primary btn--small" onClick={() => onPay(item)}>רישום תשלום</button>
-                    <button className="btn btn--secondary btn--small" onClick={() => openTask(item)}>פתיחת משימה</button>
+                  {item.expectedAmount != null && <b className="nowrap shrink-0">{formatILS(item.expectedAmount)}</b>}
+                  <div className="row no-print shrink-0" style={{ gap: 'var(--space-1)' }}>
+                    <button className="btn btn--primary btn--small btn-icon-mobile" onClick={() => onPay(item)} aria-label="רישום תשלום" title="רישום תשלום"><Banknote size={16} /> <span className="hide-mobile">רישום תשלום</span></button>
+                    <button className="btn btn--secondary btn--small btn-icon-mobile" onClick={() => openTask(item)} aria-label="פתיחת משימה" title="פתיחת משימה"><ListPlus size={16} /> <span className="hide-mobile">פתיחת משימה</span></button>
                     <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => setSheet({ item })} aria-label="עריכה"><Pencil size={18} /></button>
                     <button className="icon-btn" style={{ width: 36, height: 36 }} onClick={() => setConfirmDelete(item)} aria-label="מחיקה"><Trash2 size={18} /></button>
                   </div>

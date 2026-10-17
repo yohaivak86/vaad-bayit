@@ -86,14 +86,18 @@ export default function TasksTab({ buildingId, isCommittee, onBalanceChanged, in
           {shown.map((t) => (
             <li key={t.id} className="is-link" onClick={() => setSheet({ task: t })} style={{ alignItems: 'flex-start' }}>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                  <h3 style={{ margin: 0 }}>{t.title}</h3>
-                  <span className={`badge badge--${STATUS_DOT[t.status] || 'danger'}`}>{statusLabel(t.status)}</span>
-                  {t.urgency === 'דחוף' && <span className="badge badge--danger">דחוף</span>}
-                  {t.residentReported && <span className="chip"><Home size={12} /> תקלת דייר</span>}
-                  {t.scope === 'COMPLEX' && <span className="chip"><Network size={12} /> מתחם</span>}
-                  {t.recurringTitle && <span className="chip"><Repeat size={12} /> {t.recurringTitle}</span>}
+                <div className="row" style={{ gap: 'var(--space-2)', flexWrap: 'nowrap' }}>
+                  <h3 className="ellipsis" style={{ margin: 0, flex: '0 1 auto' }}>{t.title}</h3>
+                  <span className={`badge badge--${STATUS_DOT[t.status] || 'danger'} shrink-0`}>{statusLabel(t.status)}</span>
+                  {t.urgency === 'דחוף' && <span className="badge badge--danger shrink-0">דחוף</span>}
                 </div>
+                {(t.residentReported || t.scope === 'COMPLEX' || t.recurringTitle) && (
+                  <div className="row text-caption" style={{ gap: 'var(--space-1)', flexWrap: 'nowrap', overflow: 'hidden', marginTop: 2 }}>
+                    {t.residentReported && <span className="chip nowrap"><Home size={12} /> תקלת דייר</span>}
+                    {t.scope === 'COMPLEX' && <span className="chip nowrap"><Network size={12} /> מתחם</span>}
+                    {t.recurringTitle && <span className="chip nowrap"><Repeat size={12} /> {t.recurringTitle}</span>}
+                  </div>
+                )}
                 <p className="text-footnote text-secondary row" style={{ margin: 0, flexWrap: 'wrap', gap: 'var(--space-3)' }}>
                   {t.location && <span className="row" style={{ gap: 4 }}><MapPin size={13} /> {t.location}</span>}
                   {t.dueDate && <span className="row" style={{ gap: 4 }}><CalendarDays size={13} /> {formatDateHe(t.dueDate)}</span>}
@@ -108,7 +112,7 @@ export default function TasksTab({ buildingId, isCommittee, onBalanceChanged, in
                 )}
               </div>
               {isCommittee && isOpen(t) && t.scope !== 'COMPLEX' && (
-                <button className="btn btn--secondary btn--small" onClick={(e) => { e.stopPropagation(); resolve(t); }}><Check size={16} /> הושלם</button>
+                <button className="btn btn--secondary btn--small btn-icon-mobile shrink-0" aria-label="סימון כהושלם" title="סימון כהושלם" onClick={(e) => { e.stopPropagation(); resolve(t); }}><Check size={16} /> <span className="hide-mobile">הושלם</span></button>
               )}
             </li>
           ))}

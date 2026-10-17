@@ -16,8 +16,12 @@ export default function YearTimeline({ buildingId }) {
   const [year, setYear] = useState(now.getFullYear());
   const [plan, setPlan] = useState(null);
   const [error, setError] = useState('');
-  const [fullscreen, setFullscreen] = useState(false);
+  // Display mode: an overlay over the whole screen (so it looks the same on a phone and a computer, and works
+  // where the browser has no fullscreen); where fullscreen exists it is used too.
+  const [presenting, setPresenting] = useState(false);
   const stageRef = useRef(null);
+  const wrapRef = useRef(null);
+  const realFullscreen = useRef(false);
 
   const load = useCallback(() => {
     setPlan(null);
@@ -26,14 +30,35 @@ export default function YearTimeline({ buildingId }) {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    const onChange = () => {
+      if (document.fullscreenElement) realFullscreen.current = true;
+      else if (realFullscreen.current) { realFullscreen.current = false; setPresenting(false); } // left with Esc / the browser
+    };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, []);
 
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else stageRef.current?.requestFullscreen?.();
+  // while presenting: the page behind does not scroll, and the timeline opens on today
+  useEffect(() => {
+    if (!presenting) return undefined;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const t = setTimeout(() => {
+      wrapRef.current?.querySelector('.tl-today')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+      if (stageRef.current) stageRef.current.scrollTop = 0; // keep the title and the exit button in view
+    }, 120);
+    return () => { document.body.style.overflow = previous; clearTimeout(t); };
+  }, [presenting, plan]);
+
+  const togglePresenting = () => {
+    if (presenting) {
+      if (document.fullscreenElement) document.exitFullscreen?.();
+      realFullscreen.current = false;
+      setPresenting(false);
+    } else {
+      setPresenting(true);
+      try { stageRef.current?.requestFullscreen?.()?.catch?.(() => {}); } catch { /* no fullscreen here - the overlay is enough */ }
+    }
   };
 
   const toggleAmounts = async (value) => {
@@ -52,26 +77,26 @@ export default function YearTimeline({ buildingId }) {
 
   return (
     <div className="page stack" style={{ maxWidth: 1800, gap: 'var(--space-4)' }}>
-      <section ref={stageRef} className={`card ${fullscreen ? 'presentation tl-presentation' : ''}`} style={fullscreen ? { overflow: 'auto', borderRadius: 0, padding: 'var(--space-6)' } : undefined}>
-        <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+      <section ref={stageRef} className={`card ${presenting ? 'presentation tl-presentation' : ''}`} style={presenting ? { padding: 'var(--space-5)' } : undefined}>
+        <div className="row tl-head" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: fullscreen ? 40 : undefined }}>ההוצאות הצפויות ב-{year}</h2>
+            <h2 style={{ margin: 0, fontSize: presenting ? 40 : undefined }}>ההוצאות הצפויות ב-{year}</h2>
             <p className="page-sub" style={{ margin: 0 }}>
               מה מתוכנן בכל חודש בבניין{plan?.showAmounts && plan.yearTotal !== undefined ? ` · סה"כ מתוכנן לשנה: ${formatILS(plan.yearTotal)}` : ''}
             </p>
           </div>
-          <div className="row no-print" style={{ flexWrap: 'wrap' }}>
+          <div className="row no-print bar-1" style={{ flexWrap: 'wrap' }}>
             <button onClick={() => setYear((y) => y - 1)} className="icon-btn" aria-label="שנה קודמת"><ChevronRight size={20} /></button>
             <span style={{ minWidth: 48, textAlign: 'center', font: 'var(--text-headline)' }}>{year}</span>
             <button onClick={() => setYear((y) => y + 1)} className="icon-btn" aria-label="שנה הבאה"><ChevronLeft size={20} /></button>
-            <button onClick={toggleFullscreen} className="btn btn--primary btn--small">
-              {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {fullscreen ? 'יציאה ממצב תצוגה' : 'מצב תצוגה למסך'}
+            <button onClick={togglePresenting} className="btn btn--primary btn--small" aria-label={presenting ? 'יציאה ממצב תצוגה' : 'מצב תצוגה למסך'}>
+              {presenting ? <Minimize2 size={16} /> : <Maximize2 size={16} />} {presenting ? 'יציאה' : 'מצב תצוגה'}
             </button>
-            <button onClick={() => window.print()} className="btn btn--secondary btn--small"><Printer size={16} /> הדפסה</button>
+            <button onClick={() => window.print()} className="btn btn--secondary btn--small btn-icon-mobile" aria-label="הדפסה"><Printer size={16} /> <span className="hide-mobile">הדפסה</span></button>
           </div>
         </div>
 
-        {plan?.canEditSettings && !fullscreen && (
+        {plan?.canEditSettings && !presenting && (
           <label className="row text-footnote no-print" style={{ marginBottom: 'var(--space-3)' }}>
             <input type="checkbox" checked={plan.settings.showAmountsToResidents} onChange={(e) => toggleAmounts(e.target.checked)} />
             {plan.settings.showAmountsToResidents ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -85,8 +110,8 @@ export default function YearTimeline({ buildingId }) {
         {!plan && !error && <p className="empty">טוען...</p>}
 
         {plan && (
-          <div className="tl-wrap">
-            <div className="tl" style={todayPct !== null ? { '--today': `${todayPct}%` } : undefined}>
+          <div className="tl-wrap" ref={wrapRef}>
+            <div className={`tl ${presenting ? 'tl--h' : ''}`} style={todayPct !== null ? { '--today': `${todayPct}%` } : undefined}>
               <div className="tl-line" />
               {todayPct !== null && <div className="tl-today"><span>היום</span></div>}
               {plan.months.map((m, i) => (
